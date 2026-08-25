@@ -1,0 +1,40 @@
+import type { JSX } from 'octane/jsx-runtime'
+import { Button as ButtonBase } from '@octanejs/base-ui/Button'
+
+module
+  type NativeButtonProps = JSX.IntrinsicElements['button']
+  type ButtonSize = 'md' | 'sm' | 'icon' | 'none'
+  type ButtonVariant = 'default' | 'ghost' | 'danger' | 'unstyled'
+
+  type Props = Omit<NativeButtonProps, 'class' | 'className' | 'type'> & {
+    className?: NativeButtonProps['className']
+    size?: ButtonSize
+    type?: NativeButtonProps['type']
+    variant?: ButtonVariant
+  }
+
+props { children, className, size = 'md', type = 'button', variant = 'default', ...buttonProps }: Props
+
+ButtonBase(
+  ~ {...buttonProps}
+  ~ type={type}
+  ~ className={[
+  ~   'cursor-pointer text-inherit transition-colors focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[#6da5473d] focus-visible:outline-offset-2 disabled:cursor-not-allowed',
+  ~   variant === 'default'
+  ~     ? 'rounded-[9px] border border-[#dde1da] bg-white text-[#646b61] hover:border-[#cbd1c8] hover:bg-[#f2f5f0]'
+  ~     : variant === 'ghost'
+  ~       ? 'border-0 bg-transparent'
+  ~       : variant === 'danger'
+  ~         ? 'rounded-[9px] border border-[#e0c6c2] bg-[#fff7f5] text-[#9d493d] hover:border-[#d8afa9] hover:bg-[#fff0ed]'
+  ~         : '',
+  ~   size === 'md'
+  ~     ? 'h-10 px-4 text-xs font-[750]'
+  ~     : size === 'sm'
+  ~       ? 'h-[33px] px-[11px] text-[9px] font-[750]'
+  ~       : size === 'icon'
+  ~         ? 'size-[31px] p-0'
+  ~         : '',
+  ~   className,
+  ~ ]}
+  ~ )
+  | #{children}

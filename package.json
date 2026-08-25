@@ -12,15 +12,22 @@
   },
   "dependencies": {
     "@faker-js/faker": "^10.6.0",
+    "@octanejs/base-ui": "^0.1.44",
+    "@octanejs/motion": "^0.1.45",
+    "@octanejs/nuqs": "^0.1.35",
     "@octanejs/tanstack-table": "^0.1.43",
     "beast-tsrx": "latest",
-    "octane": "^0.1.46"
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "octane": "^0.1.46",
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.8",
     "@tsrx/typescript-plugin": "0.3.118",
-    "typescript": "^5.9.3",
-    "vite": "^8.0.16",
+    "@types/node": "^26.3.0",
     "tailwindcss": "^4.1.8",
-    "@tailwindcss/vite": "^4.1.8"
+    "typescript": "^5.9.3",
+    "vite": "^8.0.16"
   }
 }

@@ -1,67 +1,348 @@
-import { useState } from 'octane'
+import { useEffect, useState } from 'octane'
+import { motion, useReducedMotion } from '@octanejs/motion'
 import ExplorerTable from './components/ExplorerTable.btsx'
 import AnalyticsTable from './components/AnalyticsTable.btsx'
 import StreamTable from './components/StreamTable.btsx'
+import Button from './components/ui/Button.btsx'
+import { formatCompact, prepareAnalyticsRows, ROW_COUNT, seedPerformanceRows } from './data'
+import type { AnalyticsRow, PerformanceRow } from './data'
+import { navigate, panelRoutes, usePanelRoute } from './router'
+import type { PanelRoute } from './router'
 
 module
-  type PanelId = 'explorer' | 'analytics' | 'stream'
+  type SeedPhase = 'preparing' | 'loading' | 'seeding' | 'ready' | 'error'
+  type AnalyticsPhase = 'idle' | 'indexing' | 'ready' | 'error'
 
-  interface Panel {
-    id: PanelId
-    label: string
-    shortLabel: string
+  interface SeedState {
+    completed: number
+    elapsedMs: number
+    error: string | null
+    phase: SeedPhase
+    rows: ReadonlyArray<PerformanceRow> | null
+    total: number
   }
 
-  const panels: Panel[] = [
-    { id: 'explorer', label: '50k Explorer', shortLabel: 'Explorer' },
-    { id: 'analytics', label: 'Grouped Analytics', shortLabel: 'Analytics' },
-    { id: 'stream', label: 'Live Stream', shortLabel: 'Stream' },
-  ]
+  interface AnalyticsState {
+    completed: number
+    elapsedMs: number
+    error: string | null
+    phase: AnalyticsPhase
+    rows: ReadonlyArray<AnalyticsRow> | null
+    total: number
+  }
+
+  const placeholderRows = [0, 1, 2, 3, 4, 5]
+  const MotionDiv = motion.div
+
+  const createInitialSeedState = (): SeedState => ({
+    completed: 0,
+    elapsedMs: 0,
+    error: null,
+    phase: 'preparing',
+    rows: null,
+    total: ROW_COUNT,
+  })
+
+  const createInitialAnalyticsState = (total = ROW_COUNT): AnalyticsState => ({
+    completed: 0,
+    elapsedMs: 0,
+    error: null,
+    phase: 'idle',
+    rows: null,
+    total,
+  })
 
 props _: Record<string, never>
-setup const [activeId, setActiveId] = useState<PanelId>('explorer')
+setup
+  const activeId = usePanelRoute()
+  const [seedAttempt, setSeedAttempt] = useState(0)
+  const [seedState, setSeedState] = useState<SeedState>(createInitialSeedState)
+  const [analyticsAttempt, setAnalyticsAttempt] = useState(0)
+  const [analyticsState, setAnalyticsState] = useState<AnalyticsState>(createInitialAnalyticsState)
+  const [tablesMounted, setTablesMounted] = useState(false)
+  const reduceMotion = useReducedMotion()
 
-main.app-shell
-  section.showcase(aria-labelledby='showcase-title')
-    header.showcase-header
-      div.brand
-        span.brand-mark(aria-hidden='true')
-          img(src='/beast.svg' alt='beast-logo')
+  useEffect(() => {
+    const controller = new AbortController()
+    let mountTimer: number | undefined
+
+    setTablesMounted(false)
+    setSeedState(createInitialSeedState())
+
+    seedPerformanceRows({
+      signal: controller.signal,
+      onProgress: (progress) => {
+        setSeedState({
+          ...progress,
+          error: null,
+          rows: null,
+        })
+      },
+    })
+      .then(({ elapsedMs, rows }) => {
+        if (controller.signal.aborted) return
+
+        setSeedState({
+          completed: rows.length,
+          elapsedMs,
+          error: null,
+          phase: 'ready',
+          rows,
+          total: rows.length,
+        })
+        mountTimer = globalThis.setTimeout(() => setTablesMounted(true), 0)
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+
+        setSeedState((current) => ({
+          ...current,
+          error: error instanceof Error ? error.message : 'The dataset could not be seeded.',
+          phase: 'error',
+          rows: null,
+        }))
+      })
+
+    return () => {
+      controller.abort()
+      if (mountTimer !== undefined) globalThis.clearTimeout(mountTimer)
+    }
+  }, [seedAttempt])
+
+  useEffect(() => {
+    if (activeId !== 'analytics' || seedState.rows === null) return
+
+    const controller = new AbortController()
+    const sourceRows = seedState.rows
+
+    setAnalyticsState((current) => current.rows === null
+      ? createInitialAnalyticsState(sourceRows.length)
+      : current)
+
+    prepareAnalyticsRows(sourceRows, {
+      signal: controller.signal,
+      onProgress: (progress) => {
+        setAnalyticsState({
+          ...progress,
+          error: null,
+          rows: null,
+        })
+      },
+    })
+      .then(({ elapsedMs, rows, sourceRowCount }) => {
+        if (controller.signal.aborted) return
+
+        setAnalyticsState({
+          completed: sourceRowCount,
+          elapsedMs,
+          error: null,
+          phase: 'ready',
+          rows,
+          total: sourceRowCount,
+        })
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+
+        setAnalyticsState((current) => ({
+          ...current,
+          error: error instanceof Error ? error.message : 'The analytics index could not be prepared.',
+          phase: 'error',
+          rows: null,
+        }))
+      })
+
+    return () => controller.abort()
+  }, [activeId, seedState.rows, analyticsAttempt])
+
+  const showAnalyticsProgress = activeId === 'analytics' && seedState.phase === 'ready'
+  const progressState = showAnalyticsProgress ? analyticsState : seedState
+  const progressPercent = progressState.total === 0
+    ? 0
+    : Math.min(100, (progressState.completed / progressState.total) * 100)
+  const progressRate = progressState.elapsedMs > 0
+    ? progressState.completed / (progressState.elapsedMs / 1_000)
+    : 0
+  const progressTitle = showAnalyticsProgress
+    ? analyticsState.phase === 'ready'
+      ? 'Ready'
+      : analyticsState.phase === 'error'
+        ? 'Indexing interrupted'
+        : analyticsState.phase === 'indexing'
+          ? 'Indexing analytics'
+          : 'Preparing analytics'
+    : seedState.phase === 'ready'
+      ? 'Ready'
+      : seedState.phase === 'error'
+        ? 'Seeding Interrupted'
+        : seedState.phase === 'seeding'
+          ? 'Seeding'
+          : seedState.phase === 'loading'
+            ? 'Loading Faker.js'
+            : 'Preparing dataset'
+  const progressDetail = showAnalyticsProgress
+    ? analyticsState.phase === 'ready'
+      ? `${analyticsState.completed.toLocaleString()} rows indexed into ${analyticsState.rows?.length.toLocaleString() ?? 0} cached buckets in ${(analyticsState.elapsedMs / 1_000).toFixed(1)}s`
+      : analyticsState.phase === 'error'
+        ? analyticsState.error ?? 'Unknown analytics indexing error'
+        : analyticsState.phase === 'idle'
+          ? 'Starting after the analytics panel paints'
+          : `${analyticsState.completed.toLocaleString()} of ${analyticsState.total.toLocaleString()} rows · ${formatCompact(progressRate)}/sec`
+    : seedState.phase === 'ready'
+      ? `${seedState.completed.toLocaleString()} rows seeded in ${(seedState.elapsedMs / 1_000).toFixed(1)}s · cached for this session`
+      : seedState.phase === 'error'
+        ? seedState.error ?? 'Unknown seeding error'
+        : seedState.phase === 'loading'
+          ? 'The interface is ready while the generator loads'
+          : seedState.phase === 'preparing'
+            ? 'Starting after the first paint'
+            : `${seedState.completed.toLocaleString()} of ${seedState.total.toLocaleString()} rows · ${formatCompact(progressRate)}/sec`
+  const progressReady = progressState.phase === 'ready'
+  const progressError = progressState.phase === 'error'
+  const progressTransition = reduceMotion
+    ? { duration: 0 }
+    : { type: 'spring', stiffness: 150, damping: 24, mass: 0.55 }
+  const retryProgress = () => {
+    if (showAnalyticsProgress) {
+      setAnalyticsAttempt((value) => value + 1)
+    } else {
+      setSeedAttempt((value) => value + 1)
+    }
+  }
+
+  const navigateToPanel = (event: MouseEvent & { currentTarget: HTMLAnchorElement }, panel: PanelRoute) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+
+    event.preventDefault()
+    navigate(panel.href)
+  }
+
+main(
+  ~ className='grid min-h-screen place-items-center p-[clamp(0px,3.5vw,0px)] max-[680px]:[place-items:start_center] max-[680px]:p-0 [&_select:focus-visible]:outline-[3px] [&_select:focus-visible]:outline-solid [&_select:focus-visible]:outline-[#6da5473d] [&_select:focus-visible]:outline-offset-2'
+  ~ )
+  section(
+    ~ className='w-[min(100%,1480px)] overflow-hidden bg-background shadow-[0_5px_5px_rgba(38,47,36,0.12),0_2px_8px_rgba(38,47,36,0.04)] backdrop-blur-[18px] max-[680px]:rounded-[21px]'
+    ~ aria-labelledby='showcase-title'
+    ~ )
+    header(className='grid grid-cols-[minmax(210px,1fr)_auto] items-center gap-6 px-6 py-5 max-[1050px]:grid-cols-[1fr_auto] max-[680px]:gap-4 max-[680px]:px-[15px] max-[680px]:py-[17px]')
+      div(className='flex min-w-0 items-center gap-2.5')
+        span(className='grid size-[42px] shrink-0 place-items-center rounded-full max-[680px]:size-[37px]' aria-hidden='true')
+          img(className='size-[42px] opacity-20' src='/beast.svg' alt='beast-logo')
         div
-          p Built with Beast
-          h2(className='text-[#ff415a]') @octanejs/tanstack-table
-      nav.panel-tabs(aria-label='Table examples' role='tablist')
-        each panel in panels key panel.id
-          button(
-            ~ type='button'
-            ~ id={`tab-${panel.id}`}
-            ~ role='tab'
-            ~ aria-controls='table-panel'
-            ~ aria-selected={activeId === panel.id}
-            ~ className={activeId === panel.id ? 'panel-tab active' : 'panel-tab'}
-            ~ onClick={() => setActiveId(panel.id)}
+          p(className='m-0 mb-0.5 text-[10px] font-[750] uppercase tracking-[0.11em]') Built with Beast
+          h2#showcase-title(className='m-0 font-mono text-xs text-[#ff415a]') @octanejs/tanstack-table
+      nav(
+        ~ className='inline-flex items-center justify-self-end gap-[3px] rounded-full border border-[rgba(25,30,24,0.045)] bg-muted p-1 max-[1050px]:col-span-full max-[1050px]:row-start-2 max-[1050px]:justify-self-center max-[680px]:w-full'
+        ~ aria-label='Table examples'
+        ~ )
+        each panel in panelRoutes key panel.id
+          a(
+            ~ href={panel.href}
+            ~ id={`route-${panel.id}`}
+            ~ aria-current={activeId === panel.id ? 'page' : undefined}
+            ~ className={`text-center min-w-[142px] cursor-pointer rounded-full border-0 px-4 py-2.5 text-xs font-medium tracking-[-0.01em] transition-[color,background,box-shadow] duration-150 hover:text-[#242824] max-[680px]:min-w-0 max-[680px]:flex-1 max-[680px]:px-2 ${activeId === panel.id ? 'bg-[rgba(255,255,255,0.98)] text-[#1f231f] shadow-[0_1px_5px_rgba(37,43,35,0.13)]' : 'bg-transparent text-[#666]'}`}
+            ~ onClick={(event) => navigateToPanel(event, panel)}
             ~ )
-            span.tab-long #{panel.label}
-            span.tab-short #{panel.shortLabel}
-      div.binding-badge
-        span.binding-pulse(aria-hidden='true')
-        | v9 binding
-
+            span(className='max-[680px]:hidden') #{panel.label}
+            span(className='hidden max-[680px]:inline') #{panel.shortLabel}
     section#table-panel(
-      ~ role='tabpanel'
       ~ aria-live='polite'
-      ~ aria-labelledby={`tab-${activeId}`}
-      ~ className='panel-surface'
+      ~ aria-labelledby={`route-${activeId}`}
+      ~ className='relative mx-2.5 rounded-t-[1.41em] rounded-b-[0.5em] border border-input bg-muted p-2 max-[680px]:mx-[5px] max-[680px]:rounded-[18px] max-[680px]:p-[5px]'
       ~ )
-      if activeId === 'explorer'
-        ExplorerTable
-      elseif activeId === 'analytics'
-        AnalyticsTable
-      else
-        StreamTable
+      div(className='absolute -top-3.25 rounded-[-4px] -left-3.25 border-r border-input bg-background size-6.5 rotate-45')
+      div(className='absolute -top-3.25 rounded-[-4px] -right-3.25 border-l border-input bg-background size-6.5 -rotate-45')
+      div(
+        ~ className='mb-2 grid min-h-[16px] grid-cols-[minmax(100px,auto)_minmax(120px,1fr)_auto_auto] items-center gap-2 rounded-2xl px-2 py-0.5 shadow-[0_1px_2px_rgba(28,34,26,0.03)] max-[680px]:grid-cols-[1fr_auto] max-[680px]:gap-x-3.5 max-[680px]:gap-y-2.5 max-[680px]:p-2'
+        ~ role='status'
+        ~ aria-live='polite'
+        ~ )
+        div(className='flex min-w-0 items-center gap-2')
+          span(
+            ~ className={`size-2 shrink-0 rounded-full motion-reduce:animate-none ${progressReady ? 'bg-success' : progressError ? 'bg-octane shadow-[0_0_0_5px_rgba(202,89,75,0.11)] animate-pulse' : 'bg-[#ff415a] shadow-[0_0_0_5px_rgba(255,65,90,0.11)] animate-pulse'}`}
+            ~ aria-hidden='true'
+            ~ )
+          div(className='grid min-w-0 gap-0.75')
+            b(className='text-2xs text-[#292e28]') #{progressTitle} in #{(progressState.elapsedMs / 1_000).toFixed(1)}s
+            // span #{progressDetail}
+        div(
+          ~ className='relative h-[7px] w-full overflow-hidden rounded-full bg-[#e3e7e0] max-[680px]:col-span-full max-[680px]:row-start-2'
+          ~ role='progressbar'
+          ~ aria-label={showAnalyticsProgress ? 'Analytics indexing progress' : 'Dataset seeding progress'}
+          ~ aria-valuemin={0}
+          ~ aria-valuemax={100}
+          ~ aria-valuenow={Number(progressPercent.toFixed(0))}
+          ~ )
+          MotionDiv(
+            ~ className={`h-full w-full origin-left rounded-full will-change-transform ${progressReady ? 'bg-success' : progressError ? 'bg-octane' : 'bg-[#ff415a]'}`}
+            ~ initial={{ scaleX: 0 }}
+            ~ animate={{ scaleX: progressPercent / 100 }}
+            ~ transition={progressTransition}
+            ~ )
+        div(className='grid min-w-[52px] gap-0.5 text-right max-[680px]:col-start-2 max-[680px]:row-start-1')
+          b(className='font-mono text-[11px] tabular-nums text-[#363b35]') #{progressPercent.toFixed(0)}%
 
-    footer.showcase-footer
+        if progressError
+          Button(
+            ~ type='button'
+            ~ variant='danger'
+            ~ size='none'
+            ~ className='h-8 px-3 text-[9px] font-[750] max-[680px]:col-span-full max-[680px]:justify-self-start'
+            ~ onClick={retryProgress}
+            ~ ) Retry
+
+      if seedState.rows === null || !tablesMounted
+        section(className='grid min-h-[min(610px,70vh)] grid-cols-[minmax(260px,0.7fr)_minmax(420px,1.3fr)] items-center gap-[clamp(30px,6vw,90px)] overflow-hidden rounded-[18px] border border-[rgba(25,31,24,0.065)] bg-[#fcfdfb] p-[clamp(34px,6vw,82px)] max-[1050px]:grid-cols-[minmax(240px,0.8fr)_minmax(360px,1.2fr)] max-[1050px]:gap-[35px] max-[1050px]:px-[34px] max-[1050px]:py-11 max-[680px]:min-h-[560px] max-[680px]:grid-cols-1 max-[680px]:gap-8 max-[680px]:px-5 max-[680px]:pb-[30px] max-[680px]:pt-[38px]' aria-labelledby='seed-stage-title')
+          div(className='max-w-[440px]')
+            h2#seed-stage-title(className='m-0 max-w-[440px] text-[clamp(20px,4vw,36px)] font-[590] leading-[1.02] tracking-[-0.055em] text-[#20241f]') #{seedState.phase === 'error' ? 'The dataset needs another try' : 'Fetching data...'}
+            p(className='mb-0 mt-[18px] max-w-[390px] text-[13px] leading-[1.6] text-[#7c8379]') #{seedState.phase === 'error' ? 'Retry the deterministic seed without reloading the page.' : 'Rows are created in small chunks and progress stay responsive.'}
+          div(className='rotate-[0.8deg] overflow-hidden rounded-[15px] border border-[#e2e6df] bg-white shadow-[0_22px_50px_rgba(40,49,37,0.08)] max-[680px]:w-[720px] max-[680px]:max-w-none' aria-hidden='true')
+            div(className='grid min-h-10 grid-cols-[1.5fr_1fr_0.8fr_0.65fr_0.7fr] items-center gap-[18px] border-b border-[#edf0eb] bg-[#f5f7f3] px-[18px] [&_span]:block [&_span]:h-1.5 [&_span]:w-[56%] [&_span]:overflow-hidden [&_span]:rounded-full [&_span]:bg-[#dfe3dc]')
+              span
+              span
+              span
+              span
+              span
+            each row in placeholderRows key row
+              div(className="grid min-h-[52px] grid-cols-[1.5fr_1fr_0.8fr_0.65fr_0.7fr] items-center gap-[18px] border-b border-[#edf0eb] px-[18px] last:border-b-0 [&_span]:block [&_span]:h-[7px] [&_span]:overflow-hidden [&_span]:rounded-full [&_span]:bg-[#e8ebe6] [&_span]:after:block [&_span]:after:h-full [&_span]:after:w-[45%] [&_span]:after:animate-pulse [&_span]:after:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.85),transparent)] [&_span]:after:content-[''] [&_span:first-child]:h-2.5 [&_span:first-child]:w-[88%] [&_span:nth-child(2)]:w-[74%] [&_span:nth-child(3)]:w-[65%] [&_span:nth-child(4)]:w-[82%] [&_span:nth-child(5)]:w-[62%]")
+                span
+                span
+                span
+                span
+                span
+      elseif activeId === 'analytics' && analyticsState.rows === null
+        section(className='grid min-h-[min(610px,70vh)] grid-cols-[minmax(260px,0.7fr)_minmax(420px,1.3fr)] items-center gap-[clamp(30px,6vw,90px)] overflow-hidden rounded-[18px] border border-[rgba(25,31,24,0.065)] bg-[#fcfdfb] p-[clamp(34px,6vw,82px)] max-[1050px]:grid-cols-[minmax(240px,0.8fr)_minmax(360px,1.2fr)] max-[1050px]:gap-[35px] max-[1050px]:px-[34px] max-[1050px]:py-11 max-[680px]:min-h-[560px] max-[680px]:grid-cols-1 max-[680px]:gap-8 max-[680px]:px-5 max-[680px]:pb-[30px] max-[680px]:pt-[38px]' aria-labelledby='analytics-stage-title')
+          div(className='max-w-[440px]')
+            p(className='mb-[11px] mt-0 text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#889184]') Non-blocking analytics setup
+            h2#analytics-stage-title(className='m-0 max-w-[440px] text-[clamp(28px,4vw,48px)] font-[590] leading-[1.02] tracking-[-0.055em] text-[#20241f]') #{analyticsState.phase === 'error' ? 'The analytics index needs another try' : 'The table shell stays interactive'}
+            p(className='mb-0 mt-[18px] max-w-[390px] text-[13px] leading-[1.6] text-[#7c8379]') #{analyticsState.phase === 'error' ? 'Retry the cached source-row scan without reseeding Faker data.' : 'Source rows are reduced into cached market buckets in small chunks, with live progress above.'}
+          div(className='rotate-[0.8deg] overflow-hidden rounded-[15px] border border-[#e2e6df] bg-white shadow-[0_22px_50px_rgba(40,49,37,0.08)] max-[680px]:w-[720px] max-[680px]:max-w-none' aria-hidden='true')
+            div(className='grid min-h-10 grid-cols-[1.5fr_1fr_0.8fr_0.65fr_0.7fr] items-center gap-[18px] border-b border-[#edf0eb] bg-[#f5f7f3] px-[18px] [&_span]:block [&_span]:h-1.5 [&_span]:w-[56%] [&_span]:overflow-hidden [&_span]:rounded-full [&_span]:bg-[#dfe3dc]')
+              span
+              span
+              span
+              span
+              span
+            each row in placeholderRows key row
+              div(className="grid min-h-[52px] grid-cols-[1.5fr_1fr_0.8fr_0.65fr_0.7fr] items-center gap-[18px] border-b border-[#edf0eb] px-[18px] last:border-b-0 [&_span]:block [&_span]:h-[7px] [&_span]:overflow-hidden [&_span]:rounded-full [&_span]:bg-[#e8ebe6] [&_span]:after:block [&_span]:after:h-full [&_span]:after:w-[45%] [&_span]:after:animate-pulse [&_span]:after:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.85),transparent)] [&_span]:after:content-[''] [&_span:first-child]:h-2.5 [&_span:first-child]:w-[88%] [&_span:nth-child(2)]:w-[74%] [&_span:nth-child(3)]:w-[65%] [&_span:nth-child(4)]:w-[82%] [&_span:nth-child(5)]:w-[62%]")
+                span
+                span
+                span
+                span
+                span
+      elseif activeId === 'explorer'
+        ExplorerTable(rows={seedState.rows} seedDurationMs={seedState.elapsedMs})
+      elseif activeId === 'analytics'
+        AnalyticsTable(
+          ~ rows={analyticsState.rows}
+          ~ sourceRowCount={seedState.rows.length}
+          ~ indexDurationMs={analyticsState.elapsedMs}
+          ~ )
+      else
+        StreamTable(rows={seedState.rows})
+
+    footer(className='flex min-h-[50px] items-center justify-between gap-[18px] px-[22px] py-2.5 text-[9px] font-semibold text-[#969c93] max-[680px]:flex-col max-[680px]:items-start max-[680px]:gap-[5px] max-[680px]:px-[17px] max-[680px]:py-3.5 [&_p]:m-0 [&_p]:flex [&_p]:items-center [&_p]:gap-2')
       p
-        span.footer-dot(aria-hidden='true')
+        span(className='size-[5px] rounded-full bg-[#9fc982]' aria-hidden='true')
         | Deterministic data by Faker.js
       p Headless models · atom-level state · bounded DOM

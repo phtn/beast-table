@@ -1,11 +1,28 @@
-import { useEffect, useState } from 'octane'
-import { createColumnHelper, flexRender, useTable } from '@octanejs/tanstack-table'
-import { formatCompact, formatRelativeTime, statusClass, streamRows, STREAM_ROW_COUNT } from '../data'
+import { useEffect, useMemo, useState } from 'octane'
+import { createColumnHelper, flexRender, functionalUpdate, useTable } from '@octanejs/tanstack-table'
+import type { ColumnVisibilityState, PaginationState, SortingState } from '@octanejs/tanstack-table'
+import { parseAsBoolean, parseAsInteger, parseAsStringLiteral, useQueryStates } from '@octanejs/nuqs'
+import { Badge, Button, HealthMeter, Metric, Switch } from './ui'
+import { formatCompact, formatRelativeTime, STREAM_ROW_COUNT } from '../data'
 import type { PerformanceRow } from '../data'
 import { streamFeatures } from '../table-config'
 
 module
+  interface Props {
+    rows: ReadonlyArray<PerformanceRow>
+  }
+
   const columnHelper = createColumnHelper<typeof streamFeatures, PerformanceRow>()
+  const streamSortIds = ['account', 'status', 'latency', 'events', 'region', 'plan', 'health', 'updatedAt'] as const
+  const streamQueryParsers = {
+    live: parseAsBoolean.withDefault(false),
+    page: parseAsInteger.withDefault(1),
+    sort: parseAsStringLiteral(streamSortIds).withDefault('updatedAt'),
+    desc: parseAsBoolean.withDefault(true),
+    events: parseAsBoolean.withDefault(true),
+    region: parseAsBoolean.withDefault(false),
+    plan: parseAsBoolean.withDefault(true),
+  }
   const columns = columnHelper.columns([
     columnHelper.accessor('account', {
       header: 'Signal',
@@ -23,9 +40,25 @@ module
     columnHelper.accessor('updatedAt', { header: 'Last event', sortFn: 'basic', size: 130 }),
   ])
 
+props { rows: sourceRows }: Props
 setup
-  const [rows, setRows] = useState<PerformanceRow[]>(() => streamRows)
-  const [isLive, setIsLive] = useState(false)
+  const [{ live: isLive, page, sort, desc, events, region, plan }, setStreamQuery] = useQueryStates(
+    streamQueryParsers,
+    { history: 'replace' },
+  )
+  const pagination = useMemo<PaginationState>(() => ({
+    pageIndex: Math.max(0, page - 1),
+    pageSize: 20,
+  }), [page])
+  const sorting = useMemo<SortingState>(() => [
+    { id: sort, desc },
+  ], [sort, desc])
+  const columnVisibility = useMemo<ColumnVisibilityState>(() => ({
+    events,
+    region,
+    plan,
+  }), [events, region, plan])
+  const [rows, setRows] = useState<PerformanceRow[]>(() => sourceRows.slice(0, STREAM_ROW_COUNT))
   const [pulse, setPulse] = useState(0)
   const [lastBurstMs, setLastBurstMs] = useState(0)
 
@@ -37,10 +70,30 @@ setup
       columns,
       getRowId: (row) => row.id,
       columnResizeMode: 'onChange',
-      initialState: {
-        pagination: { pageIndex: 0, pageSize: 20 },
-        sorting: [{ id: 'updatedAt', desc: true }],
-        columnVisibility: { region: false },
+      state: {
+        columnVisibility,
+        pagination,
+        sorting,
+      },
+      onColumnVisibilityChange: (updater) => {
+        const nextVisibility = functionalUpdate(updater, columnVisibility)
+        void setStreamQuery({
+          events: nextVisibility.events !== false,
+          region: nextVisibility.region === true,
+          plan: nextVisibility.plan !== false,
+        })
+      },
+      onPaginationChange: (updater) => {
+        const nextPagination = functionalUpdate(updater, pagination)
+        void setStreamQuery({ page: nextPagination.pageIndex + 1 })
+      },
+      onSortingChange: (updater) => {
+        const nextSorting = functionalUpdate(updater, sorting)[0]
+        void setStreamQuery({
+          sort: nextSorting?.id ?? 'updatedAt',
+          desc: nextSorting?.desc ?? true,
+          page: 1,
+        })
       },
     },
     (state) => ({
@@ -102,77 +155,75 @@ setup
   const regionColumn = table.getColumn('region')
   const planColumn = table.getColumn('plan')
 
-section.table-example(aria-labelledby='stream-heading')
-  header.example-heading
+section(className='overflow-hidden rounded-[18px] border border-[rgba(25,31,24,0.065)] bg-[#fcfdfb] shadow-[0_1px_2px_rgba(28,34,26,0.04)] max-[680px]:rounded-[14px]' aria-labelledby='stream-heading')
+  header(className='flex items-start justify-between gap-7 px-[clamp(20px,3vw,38px)] pb-[26px] pt-[clamp(24px,3vw,38px)] max-[1050px]:flex-col max-[680px]:gap-5 max-[680px]:px-[18px] max-[680px]:pb-[22px] max-[680px]:pt-[25px]')
     div
-      p.eyebrow Update + resize + visibility
-      h2(className='text-xl!') Streaming
-      p.example-description Re-sort a changing 12k-row feed, resize columns in place, and keep DOM work bounded to 20 rows.
-    div.metric-row(aria-label='Stream performance')
-      span.metric
-        b #{STREAM_ROW_COUNT.toLocaleString()}
-        | rows
-      span.metric
-        b #{pulse.toLocaleString()}
-        | pulses
-      span.metric.metric-accent
-        b #{modelDurationMs.toFixed(2)}ms
-        | model
+      p(className='mb-[11px] mt-0 text-[10px] font-extrabold uppercase tracking-[0.13em] text-[#889184]') Update + resize + visibility
+      h2#stream-heading(className='m-0 text-[clamp(26px,3.5vw,42px)] font-[590] leading-none') Streaming
+      p(className='mb-0 mt-1.5 max-w-[700px] text-[13px] leading-[1.55] text-[#747b72]') Re-sort a changing 12k-row feed, resize columns in place, and keep DOM work bounded to 20 rows.
+    div(className='flex max-w-[530px] shrink-0 flex-wrap justify-end gap-[7px] max-[1050px]:justify-start max-[680px]:grid max-[680px]:w-full max-[680px]:grid-cols-3' aria-label='Stream performance')
+      Metric(value={STREAM_ROW_COUNT.toLocaleString()} label='rows')
+      Metric(value={pulse.toLocaleString()} label='pulses')
+      Metric(value={`${modelDurationMs.toFixed(2)}ms`} label='model' accent)
 
-  div.table-toolbar.stream-toolbar
-    div.live-controls
-      button(
-        ~ type='button'
-        ~ aria-pressed={isLive}
-        ~ className={isLive ? 'live-button active' : 'live-button'}
-        ~ onClick={() => setIsLive(!isLive)}
-        ~ )
-        span.live-dot(aria-hidden='true')
-        | #{isLive ? 'Streaming' : 'Start stream'}
-      button.secondary-button(type='button' onClick={runBurst}) Update 1,000 rows
+  div(className='flex min-h-16 items-center justify-between gap-[18px] border-t border-[#eef0ec] bg-[#f8f9f7] px-4 py-[11px] max-[1050px]:flex-col max-[1050px]:items-start max-[680px]:items-start')
+    div(className='flex items-center gap-[9px] text-[11px] font-semibold text-[#7c8379] max-[680px]:flex-wrap')
+      Switch(checked={isLive} onCheckedChange={(checked) => void setStreamQuery({ live: checked })} aria-label='Toggle live stream') #{isLive ? 'Streaming' : 'Start stream'}
+      Button(size='sm' type='button' onClick={runBurst}) Update 1,000 rows
       if lastBurstMs > 0
-        span.burst-time #{lastBurstMs.toFixed(2)}ms mutation
-    div.column-controls(aria-label='Visible columns')
-      span Columns
-      button(
+        span(className='font-mono text-[9px] text-[#84917c]') #{lastBurstMs.toFixed(2)}ms mutation
+    div(className='flex items-center gap-[9px] text-[11px] font-semibold text-[#7c8379] max-[1050px]:w-full max-[1050px]:flex-wrap' aria-label='Visible columns')
+      span(className='mr-0.5 text-[#979d94]') Columns
+      Button(
         ~ type='button'
+        ~ variant='unstyled'
+        ~ size='none'
         ~ aria-pressed={eventColumn.getIsVisible()}
-        ~ className={eventColumn.getIsVisible() ? 'column-chip active' : 'column-chip'}
+        ~ className={`h-[33px] cursor-pointer rounded-[9px] border px-[11px] text-[9px] font-[750] hover:border-[#cbd1c8] hover:bg-[#f2f5f0] ${eventColumn.getIsVisible() ? 'border-[#bfcdb6] bg-[#eaf2e5] text-[#4c673c] shadow-[inset_0_0_0_1px_rgba(116,153,89,0.06)]' : 'border-[#dde1da] bg-white text-[#646b61]'}`}
         ~ onClick={() => eventColumn.toggleVisibility()}
         ~ ) Events
-      button(
+      Button(
         ~ type='button'
+        ~ variant='unstyled'
+        ~ size='none'
         ~ aria-pressed={regionColumn.getIsVisible()}
-        ~ className={regionColumn.getIsVisible() ? 'column-chip active' : 'column-chip'}
+        ~ className={`h-[33px] cursor-pointer rounded-[9px] border px-[11px] text-[9px] font-[750] hover:border-[#cbd1c8] hover:bg-[#f2f5f0] ${regionColumn.getIsVisible() ? 'border-[#bfcdb6] bg-[#eaf2e5] text-[#4c673c] shadow-[inset_0_0_0_1px_rgba(116,153,89,0.06)]' : 'border-[#dde1da] bg-white text-[#646b61]'}`}
         ~ onClick={() => regionColumn.toggleVisibility()}
         ~ ) Region
-      button(
+      Button(
         ~ type='button'
+        ~ variant='unstyled'
+        ~ size='none'
         ~ aria-pressed={planColumn.getIsVisible()}
-        ~ className={planColumn.getIsVisible() ? 'column-chip active' : 'column-chip'}
+        ~ className={`h-[33px] cursor-pointer rounded-[9px] border px-[11px] text-[9px] font-[750] hover:border-[#cbd1c8] hover:bg-[#f2f5f0] ${planColumn.getIsVisible() ? 'border-[#bfcdb6] bg-[#eaf2e5] text-[#4c673c] shadow-[inset_0_0_0_1px_rgba(116,153,89,0.06)]' : 'border-[#dde1da] bg-white text-[#646b61]'}`}
         ~ onClick={() => planColumn.toggleVisibility()}
         ~ ) Plan
 
-  div.table-frame
-    div.table-scroll
-      table.data-table.stream-table(style={{ width: `${table.getTotalSize()}px` }})
+  div(className='border-t border-[#e8ebe6]')
+    div(className='max-h-[min(590px,63vh)] w-full overflow-auto [scrollbar-color:#c7ccc4_transparent] [scrollbar-width:thin]')
+      table(className='min-w-[960px] table-fixed border-separate border-spacing-0 whitespace-nowrap [&_th]:sticky [&_th]:top-0 [&_th]:z-[2] [&_th]:h-[42px] [&_th]:border-b [&_th]:border-[#e4e7e2] [&_th]:bg-[rgba(246,248,244,0.96)] [&_th]:px-4 [&_th]:py-0 [&_th]:text-left [&_th]:text-[9px] [&_th]:font-extrabold [&_th]:uppercase [&_th]:tracking-[0.1em] [&_th]:text-[#7f867c] [&_th]:backdrop-blur-sm [&_td]:h-[55px] [&_td]:overflow-hidden [&_td]:border-b [&_td]:border-[#edf0eb] [&_td]:px-4 [&_td]:py-2 [&_td]:text-[11px] [&_td]:text-ellipsis [&_td]:text-[#50564e] [&_tbody_tr]:bg-[#fcfdfb] [&_tbody_tr]:transition-colors [&_tbody_tr]:duration-100 [&_tbody_tr:hover]:bg-[#f7f9f5] [&_tbody_tr:last-child_td]:border-b-0' style={{ width: `${table.getTotalSize()}px` }})
         thead
           each headerGroup in table.getHeaderGroups() key headerGroup.id
             tr
               each header in headerGroup.headers key header.id
                 th(scope='col' style={{ width: `${header.getSize()}px` }})
-                  button.sort-button(
+                  Button(
                     ~ type='button'
+                    ~ variant='ghost'
+                    ~ size='none'
+                    ~ className='inline-flex w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent px-0 py-[5px] text-left text-[inherit] [font-weight:inherit] uppercase tracking-[inherit] disabled:cursor-default'
                     ~ disabled={!header.column.getCanSort()}
                     ~ onClick={header.column.getToggleSortingHandler()}
                     ~ )
                     span #{header.isPlaceholder ? '' : flexRender(header.column.columnDef.header, header.getContext())}
-                    span.sort-mark(aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
+                    span(className='text-[10px] text-[#bdc2ba]' aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
                   if header.column.getCanResize()
-                    button.column-resizer(
+                    Button(
                       ~ type='button'
+                      ~ variant='unstyled'
+                      ~ size='none'
                       ~ aria-label={`Resize ${header.column.id} column`}
-                      ~ className={header.column.getIsResizing() ? 'active:cursor-col-resize' : 'column-resizer'}
+                      ~ className={`absolute -right-[3px] top-0 z-[3] h-full w-2 touch-none border-0 bg-transparent p-0 after:absolute after:right-[3px] after:top-2.5 after:h-[22px] after:w-px after:bg-[#dce0da] after:content-[''] hover:after:w-0.5 hover:after:bg-[#85a76e] ${header.column.getIsResizing() ? 'cursor-col-resize after:w-0.5 after:bg-[#85a76e]' : ''}`}
                       ~ onMouseDown={header.getResizeHandler()}
                       ~ onTouchStart={header.getResizeHandler()}
                       ~ onDoubleClick={() => header.column.resetSize()}
@@ -182,34 +233,31 @@ section.table-example(aria-labelledby='stream-heading')
             tr
               each cell in row.getVisibleCells() key cell.id
                 td(
-                  ~ className={cell.column.id === 'latency' || cell.column.id === 'events' || cell.column.id === 'health' ? 'numeric-cell' : ''}
+                  ~ className={cell.column.id === 'latency' || cell.column.id === 'events' || cell.column.id === 'health' ? 'text-right' : ''}
                   ~ style={{ width: `${cell.column.getSize()}px` }}
                   ~ )
                   if cell.column.id === 'account'
-                    div.signal-cell
-                      span.signal-indicator(className={row.original.latency > 420 ? 'signal-indicator hot' : row.original.latency < 120 ? 'signal-indicator fast' : 'signal-indicator'})
-                      div.primary-secondary
+                    div(className='flex min-w-0 items-center gap-[9px]')
+                      span(className={row.original.latency > 420 ? 'size-[7px] shrink-0 rounded-full bg-[#db7968] shadow-[0_0_0_4px_rgba(219,121,104,0.12)]' : row.original.latency < 120 ? 'size-[7px] shrink-0 rounded-full bg-[#76b753] shadow-[0_0_0_4px_rgba(118,183,83,0.12)]' : 'size-[7px] shrink-0 rounded-full bg-[#e1a94f] shadow-[0_0_0_4px_rgba(225,169,79,0.12)]'})
+                      div(className='grid min-w-0 items-center gap-[3px] [&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_b]:text-[#242824] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
                         b #{row.original.account}
                         small #{row.original.id}
                   elseif cell.column.id === 'status'
-                    span(className={statusClass(row.original.status)}) #{row.original.status}
+                    Badge(tone={row.original.status === 'Healthy' ? 'success' : row.original.status === 'Watching' ? 'warning' : row.original.status === 'At risk' ? 'danger' : 'info'}) #{row.original.status}
                   elseif cell.column.id === 'latency'
-                    b(className={row.original.latency > 420 ? 'numeric latency-hot' : 'numeric'}) #{row.original.latency}ms
+                    b(className={`font-mono text-[10px] font-[680] tabular-nums ${row.original.latency > 420 ? 'text-[#b15345]' : 'text-[#303530]'}`}) #{row.original.latency}ms
                   elseif cell.column.id === 'events'
-                    span.numeric #{formatCompact(row.original.events)}
+                    span(className='font-mono text-[10px] font-[680] tabular-nums text-[#303530]') #{formatCompact(row.original.events)}
                   elseif cell.column.id === 'health'
-                    div.health-cell
-                      span #{row.original.health}
-                      span.health-track(aria-hidden='true')
-                        span.health-fill(style={{ width: `${row.original.health}%` }})
+                    HealthMeter(value={row.original.health})
                   elseif cell.column.id === 'updatedAt'
-                    span.muted #{formatRelativeTime(row.original.updatedAt)}
+                    span(className='text-[#90968d]') #{formatRelativeTime(row.original.updatedAt)}
                   else
                     | #{String(cell.getValue() ?? '—')}
 
-    footer.table-footer
+    footer(className='grid min-h-[58px] grid-cols-[1fr_auto_1fr] items-center gap-[18px] border-t border-[#e8ebe6] bg-[#f8f9f7] px-4 py-[9px] text-[10px] font-semibold text-[#81877e] max-[680px]:grid-cols-[1fr_auto] [&_p]:m-0 [&_p:nth-child(2)]:text-center max-[680px]:[&_p:nth-child(2)]:hidden')
       p #{table.getVisibleLeafColumns().length} visible columns · drag headers to resize
       p Page #{table.state.pagination.pageIndex + 1} of #{Math.max(1, table.getPageCount()).toLocaleString()}
-      div.pagination
-        button(type='button' aria-label='Previous page' disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}) ‹
-        button(type='button' aria-label='Next page' disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}) ›
+      div(className='flex justify-end gap-[5px]')
+        Button(className='grid place-items-center text-[15px] leading-none disabled:opacity-40' size='icon' type='button' aria-label='Previous page' disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}) ‹
+        Button(className='grid place-items-center text-[15px] leading-none disabled:opacity-40' size='icon' type='button' aria-label='Next page' disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}) ›

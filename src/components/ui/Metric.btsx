@@ -1,0 +1,26 @@
+import type { JSX } from 'octane/jsx-runtime'
+
+module
+  type NativeSpanProps = JSX.IntrinsicElements['span']
+
+  type Props = Omit<NativeSpanProps, 'children' | 'class' | 'className'> & {
+    accent?: boolean
+    className?: NativeSpanProps['className']
+    label: string
+    value: string
+  }
+
+props { accent = false, className, label, value, ...spanProps }: Props
+
+span(
+  ~ {...spanProps}
+  ~ className={[
+  ~   'grid min-w-[106px] gap-[3px] px-2.5 py-1.5 text-2xs tracking-wider uppercase max-[680px]:min-w-0 max-[680px]:p-2.5',
+  ~   accent
+  ~     ? ' text-[#708264] [&_b]:text-[#3b5d28]'
+  ~     : ' text-[#848a81] [&_b]:text-[#232723]',
+  ~   className,
+  ~ ]}
+  ~ )
+  b(className='font-medium text-base tracking-tight lowercase') #{value}
+  | #{label}

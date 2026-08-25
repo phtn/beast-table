@@ -1,0 +1,30 @@
+import type { JSX } from 'octane/jsx-runtime'
+
+module
+  type NativeSpanProps = JSX.IntrinsicElements['span']
+  type BadgeTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral'
+
+  type Props = Omit<NativeSpanProps, 'class' | 'className'> & {
+    className?: NativeSpanProps['className']
+    tone?: BadgeTone
+  }
+
+props { children, className, tone = 'neutral', ...spanProps }: Props
+
+span(
+  ~ {...spanProps}
+  ~ className={[
+  ~   "inline-flex items-center gap-1.5 rounded-full px-2 py-[5px] text-[9px] font-[750] before:size-[5px] before:rounded-full before:bg-current before:opacity-75 before:content-['']",
+  ~   tone === 'success'
+  ~     ? 'bg-[#e9f5e3] text-[#4f7838]'
+  ~     : tone === 'warning'
+  ~       ? 'bg-[#f7f1db] text-[#8d7126]'
+  ~       : tone === 'danger'
+  ~         ? 'bg-[#f7e6e2] text-[#a35446]'
+  ~         : tone === 'info'
+  ~           ? 'bg-[#e6eef7] text-[#527293]'
+  ~           : 'bg-[#eff1ed] text-[#646b61]',
+  ~   className,
+  ~ ]}
+  ~ )
+  | #{children}

@@ -1,0 +1,23 @@
+import type { JSX } from 'octane/jsx-runtime'
+import { Input as InputBase } from '@octanejs/base-ui/Input'
+
+
+module
+  type NativeInputProps = JSX.IntrinsicElements['input']
+
+  type Props = Omit<NativeInputProps, 'class' | 'className' | 'type'> & {
+    className?: NativeInputProps['className']
+    type?: NativeInputProps['type']
+  }
+  const baseClassName = 'h-10 w-full rounded-[11px] border border-input bg-sidebar px-3 text-sm shadow-[0_1px_2px_rgba(31,36,29,0.03)] placeholder:text-soft placeholder:select-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[#6da5473d] focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
+
+props { className, type = 'text', ...inputProps }: Props
+
+InputBase(
+  ~ {...inputProps}
+  ~ type={type}
+  ~ className={[
+  ~   baseClassName,
+  ~   className,
+  ~ ]}
+  ~ )

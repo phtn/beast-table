@@ -4,7 +4,7 @@ A performance showcase for [`@octanejs/tanstack-table`](https://www.npmjs.com/pa
 
 The three panel tabs demonstrate:
 
-- filtering, multi-column sorting, pagination, and row selection across 50,000 rows;
+- filtering, multi-column sorting, pagination, and row selection across 500,000 rows;
 - nested grouping, expansion, and live aggregation across the same dataset;
 - a 12,000-row updating stream with sorting, column visibility, and resizing.
 

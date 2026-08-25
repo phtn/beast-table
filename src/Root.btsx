@@ -1,0 +1,7 @@
+import { NuqsAdapter } from '@octanejs/nuqs/adapters/react'
+import App from './App.btsx'
+
+props _: Record<string, never>
+
+NuqsAdapter
+  App

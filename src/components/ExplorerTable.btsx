@@ -1,10 +1,37 @@
-import { createColumnHelper, flexRender, useTable } from '@octanejs/tanstack-table'
-import { formatCurrency, formatRelativeTime, performanceRows, ROW_COUNT, seedDurationMs, statusClass } from '../data'
-import type { PerformanceRow } from '../data'
+import { createColumnHelper, flexRender, functionalUpdate, useTable } from '@octanejs/tanstack-table'
+import type { PaginationState, SortingState } from '@octanejs/tanstack-table'
+import { parseAsBoolean, parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from '@octanejs/nuqs'
+import { useEffect, useMemo, useState } from 'octane'
+import { Badge, Button, Checkbox, HealthMeter, Input, Metric, Header } from './ui'
+import { formatCurrency, formatRelativeTime, prepareExplorerRows } from '../data'
+import type { ExplorerProgress, PerformanceRow } from '../data'
 import { explorerFeatures } from '../table-config'
 
 module
+  interface Props {
+    rows: ReadonlyArray<PerformanceRow>
+    seedDurationMs: number
+  }
+
+  interface QueryState {
+    completed: number
+    elapsedMs: number
+    error: string | null
+    matched: number
+    phase: 'idle' | ExplorerProgress['phase'] | 'ready' | 'error'
+    total: number
+  }
+
   const columnHelper = createColumnHelper<typeof explorerFeatures, PerformanceRow>()
+  const explorerSortIds = ['account', 'contact', 'email', 'region', 'plan', 'status', 'revenue', 'health', 'updatedAt'] as const
+  const explorerQueryParsers = {
+    q: parseAsString.withDefault(''),
+    page: parseAsInteger.withDefault(1),
+    size: parseAsInteger.withDefault(15),
+    sort: parseAsStringLiteral(explorerSortIds).withDefault('revenue'),
+    desc: parseAsBoolean.withDefault(true),
+  }
+  const explorerPageSizes = [10, 15, 25, 50]
   const columns = columnHelper.columns([
     columnHelper.display({
       id: 'select',
@@ -27,19 +54,122 @@ module
     }),
   ])
 
+  const createInitialQueryState = (total: number): QueryState => ({
+    completed: 0,
+    elapsedMs: 0,
+    error: null,
+    matched: total,
+    phase: 'idle',
+    total,
+  })
+
+props { rows, seedDurationMs }: Props
 setup
+  const [{ q: globalFilter, page, size, sort, desc }, setExplorerQuery] = useQueryStates(
+    explorerQueryParsers,
+    { history: 'replace' },
+  )
+  const pageSize = explorerPageSizes.includes(size) ? size : 15
+  const pagination = useMemo<PaginationState>(() => ({
+    pageIndex: Math.max(0, page - 1),
+    pageSize,
+  }), [page, pageSize])
+  const sorting = useMemo<SortingState>(() => [
+    { id: sort, desc },
+  ], [sort, desc])
+  const [processedRows, setProcessedRows] = useState<ReadonlyArray<PerformanceRow>>(rows)
+  const [queryState, setQueryState] = useState<QueryState>(() => createInitialQueryState(rows.length))
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let queryTimer: number | undefined
+
+    setQueryState(createInitialQueryState(rows.length))
+    queryTimer = globalThis.setTimeout(() => {
+      prepareExplorerRows(rows, {
+        query: globalFilter,
+        sorting,
+        signal: controller.signal,
+        onProgress: (progress) => {
+          setQueryState({
+            ...progress,
+            error: null,
+          })
+        },
+      })
+        .then((result) => {
+          if (controller.signal.aborted) return
+
+          setProcessedRows(result.rows)
+          setQueryState({
+            completed: result.rows.length,
+            elapsedMs: result.elapsedMs,
+            error: null,
+            matched: result.rows.length,
+            phase: 'ready',
+            total: result.rows.length,
+          })
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return
+
+          setQueryState((current) => ({
+            ...current,
+            error: error instanceof Error ? error.message : 'The explorer index could not be updated.',
+            phase: 'error',
+          }))
+        })
+    }, globalFilter.trim().length > 0 ? 160 : 0)
+
+    return () => {
+      controller.abort()
+      if (queryTimer !== undefined) globalThis.clearTimeout(queryTimer)
+    }
+  }, [rows, globalFilter, sorting])
+
+  const pageRows = useMemo(() => {
+    const pageStart = pagination.pageIndex * pagination.pageSize
+    return processedRows.slice(pageStart, pageStart + pagination.pageSize)
+  }, [processedRows, pagination.pageIndex, pagination.pageSize])
+
   const table = useTable(
     {
       key: 'account-explorer',
       features: explorerFeatures,
-      data: performanceRows,
+      data: pageRows,
       columns,
       globalFilterFn: 'includesString',
       getColumnCanGlobalFilter: (column) => column.id !== 'select' && column.id !== 'updatedAt',
       getRowId: (row) => row.id,
+      manualFiltering: true,
+      manualPagination: true,
+      manualSorting: true,
+      rowCount: processedRows.length,
+      state: {
+        globalFilter,
+        pagination,
+        sorting,
+      },
+      onGlobalFilterChange: (updater) => {
+        const nextFilter = String(functionalUpdate(updater, globalFilter) ?? '')
+        void setExplorerQuery({ q: nextFilter, page: 1 })
+      },
+      onPaginationChange: (updater) => {
+        const nextPagination = functionalUpdate(updater, pagination)
+        void setExplorerQuery({
+          page: nextPagination.pageIndex + 1,
+          size: nextPagination.pageSize,
+        })
+      },
+      onSortingChange: (updater) => {
+        const nextSorting = functionalUpdate(updater, sorting)[0]
+        void setExplorerQuery({
+          sort: nextSorting?.id ?? 'revenue',
+          desc: nextSorting?.desc ?? true,
+          page: 1,
+        })
+      },
       initialState: {
-        pagination: { pageIndex: 0, pageSize: 15 },
-        sorting: [{ id: 'revenue', desc: true }],
         columnVisibility: { email: false },
       },
     },
@@ -53,115 +183,122 @@ setup
   const modelStartedAt = performance.now()
   const visibleRows = table.getRowModel().rows
   const modelDurationMs = performance.now() - modelStartedAt
-  const filteredCount = table.getFilteredRowModel().rows.length
+  const filteredCount = processedRows.length
   const selectedCount = Object.keys(table.state.rowSelection).length
-  const query = String(table.state.globalFilter ?? '')
+  const query = globalFilter
+  const isQuerying = queryState.phase === 'filtering' || queryState.phase === 'sorting'
+  const queryPercent = queryState.total === 0
+    ? 0
+    : Math.min(100, (queryState.completed / queryState.total) * 100)
+  const queryLabel = queryState.phase === 'sorting' ? 'Ranking' : 'Searching'
 
-section.table-example(aria-labelledby='explorer-heading')
-  header.example-heading
-    div
-      p.eyebrow Search + sort + select
-      h2(className='text-xl!') Account Explorer
-      p.example-description Scan, rank, and select across the full seeded dataset. Only the active page reaches the DOM.
-    div.metric-row(aria-label='Performance metrics')
-      span.metric
-        b #{ROW_COUNT.toLocaleString()}
-        | rows
-      span.metric
-        b #{seedDurationMs.toFixed(0)}ms
-        | seeded
-      span.metric.metric-accent
-        b #{modelDurationMs.toFixed(2)}ms
-        | model
+section(className='relative rounded-[0.92em] border border-input/70 bg-background shadow-[0_1px_2px_rgba(28,34,26,0.04)] max-[680px]:rounded-[14px]' aria-labelledby='explorer-heading')
+  div(className='absolute -top-2 -left-2 rounded-l-full border-r border-input/70 bg-muted w-4 h-4 rotate-45')
+  div(className='absolute -top-2 -right-2 rounded-r-full border-l border-input/70 bg-muted w-4 h-4 -rotate-45')
+  div(className='absolute -bottom-2 -right-2 rounded-b-full border-t border-input/70 bg-muted w-4 h-4 -rotate-45')
+  div(className='absolute -bottom-2 -left-2 rounded-l-full border-r border-input/70 bg-muted w-4 h-4 -rotate-45')
 
-  div.table-toolbar
-    label.search-field
-      span.sr-only Search all accounts
-      span.search-icon(aria-hidden='true') ⌕
-      input(
+  Header(eyebrow='Search + sort + select' title='Account Explorer' description='Scan, rank, and select across the full seeded dataset. Only the active page reaches the table model and DOM.')
+    div(className='flex max-w-[530px] border border-input/80 rounded-md divide-x divide-input/80 overflow-hidden shrink-0 flex-wrap justify-end max-[1050px]:justify-start max-[680px]:grid max-[680px]:w-full max-[680px]:grid-cols-3' aria-label='Performance metrics')
+      Metric(value={rows.length.toLocaleString()} label='rows')
+      Metric(value={`${(seedDurationMs/1000).toFixed(0)}s`} label='seeded')
+      Metric(value={`${modelDurationMs.toFixed(2)}ms`} label='model' accent)
+
+  div(className='flex min-h-12 items-center justify-between gap-4 px-4 pb-3 max-[680px]:flex-col max-[680px]:items-start')
+    label(className='relative flex w-[min(100%,410px)] items-center max-[680px]:w-full')
+      span(className='absolute -m-px size-px overflow-hidden whitespace-nowrap border-0 p-0 [clip:rect(0,0,0,0)]') Search all accounts
+      Input(
         ~ type='search'
+        ~ className='py-0 px-3'
         ~ value={query}
         ~ placeholder='Search account, owner, region…'
         ~ onInput={(event) => table.setGlobalFilter((event.currentTarget as HTMLInputElement).value)}
         ~ )
-      if query.length > 0
-        button.clear-search(type='button' aria-label='Clear search' onClick={() => table.setGlobalFilter('')}) ×
-    div.toolbar-summary
+      // if query.length > 0
+      //   Button(className='absolute right-2 grid size-[25px] place-items-center rounded-[7px] bg-[#eff1ed] p-0 leading-none text-[#777e74]' variant='ghost' size='none' type='button' aria-label='Clear search' onClick={() => table.setGlobalFilter('')}) ×
+    div(className='flex items-center gap-2.5 text-xs text-muted-foreground max-[680px]:flex-wrap')
+      if isQuerying
+        span(className='inline-flex items-center gap-[9px]')
+          span(className='font-mono tabular-nums text-[#ff415a]' role='status') #{queryLabel} #{queryPercent.toFixed(0)}%
+          span(className='text-[#bbc0b8]' aria-hidden='true') ·
+      elseif queryState.phase === 'error'
+        span(className='inline-flex items-center gap-[9px]')
+          span(className='font-mono tabular-nums text-[#ca594b]' role='status') Index interrupted
+          span(className='text-[#bbc0b8]' aria-hidden='true') ·
       span #{filteredCount.toLocaleString()} results
-      span.divider-dot(aria-hidden='true') ·
+      span(className='text-[#bbc0b8]' aria-hidden='true') ·
       span #{selectedCount} selected
 
-  div.table-frame
-    div.table-scroll
-      table.data-table
+  div(className='border-t border-[#e8ebe6]')
+    div(className='max-h-[min(590px,63vh)] w-full overflow-auto scrollbar-track-sidebar scrollbar-thumb-octane scrollbar-thin')
+      table(className='w-full min-w-[1180px] table-auto border-separate border-spacing-0 whitespace-nowrap [&_th]:sticky [&_th]:top-0 [&_th]:z-[2] [&_th]:h-[42px] [&_th]:border-b [&_th]:border-[#e4e7e2] [&_th]:bg-sidebar [&_th]:px-4 [&_th]:py-0 [&_th]:text-left [&_th]:text-[9px] [&_th]:font-extrabold [&_th]:uppercase [&_th]:tracking-[0.1em] [&_th]:text-[#7f867c] [&_th]:backdrop-blur-sm [&_td]:h-[55px] [&_td]:overflow-hidden [&_td]:border-b [&_td]:border-[#edf0eb] [&_td]:px-4 [&_td]:py-2 [&_td]:text-[11px] [&_td]:text-ellipsis [&_td]:text-[#50564e] [&_tbody_tr]:bg-background [&_tbody_tr]:transition-colors [&_tbody_tr]:duration-100 [&_tbody_tr:hover]:bg-sidebar [&_tbody_tr:last-child_td]:border-b-0')
         thead
           each headerGroup in table.getHeaderGroups() key headerGroup.id
             tr
               each header in headerGroup.headers key header.id
                 th(
-                  ~ className={header.column.id === 'select' ? 'select-cell' : ''}
+                  ~ className={header.column.id === 'select' ? 'w-12 pr-2! pl-[18px]! text-center!' : ''}
                   ~ scope='col'
                   ~ )
                   if header.column.id === 'select'
-                    input(
-                      ~ type='checkbox'
+                    Checkbox(
                       ~ aria-label='Select all rows on this page'
                       ~ checked={table.getIsAllPageRowsSelected()}
                       ~ onChange={table.getToggleAllPageRowsSelectedHandler()}
                       ~ )
                   else
-                    button.sort-button(
+                    Button(
                       ~ type='button'
+                      ~ variant='ghost'
+                      ~ size='none'
+                      ~ className='inline-flex w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent px-0 py-[5px] text-left text-[inherit] [font-weight:inherit] uppercase tracking-[inherit] disabled:cursor-default'
                       ~ disabled={!header.column.getCanSort()}
                       ~ onClick={header.column.getToggleSortingHandler()}
                       ~ )
                       span #{header.isPlaceholder ? '' : flexRender(header.column.columnDef.header, header.getContext())}
-                      span.sort-mark(aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
+                      span(className='text-[10px] text-[#bdc2ba]' aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
         tbody
           each row in visibleRows key row.id
-            tr(className={row.getIsSelected() ? 'row-selected' : ''})
+            tr(className={row.getIsSelected() ? 'bg-sidebar! shadow-[inset_3px_0_#8fba6e]' : ''})
               each cell in row.getVisibleCells() key cell.id
-                td(className={cell.column.id === 'select' ? 'select-cell' : cell.column.id === 'revenue' || cell.column.id === 'health' ? 'numeric-cell' : ''})
+                td(className={cell.column.id === 'select' ? 'w-12 pr-2! pl-[18px]! text-center!' : cell.column.id === 'revenue' || cell.column.id === 'health' ? 'text-right' : ''})
                   if cell.column.id === 'select'
-                    input(
-                      ~ type='checkbox'
+                    Checkbox(
                       ~ aria-label={`Select ${row.original.account}`}
                       ~ checked={row.getIsSelected()}
                       ~ onChange={row.getToggleSelectedHandler()}
                       ~ )
                   elseif cell.column.id === 'account'
-                    div.account-cell
-                      span.account-mark(aria-hidden='true') #{row.original.account.slice(0, 2).toUpperCase()}
-                      div
+                    div(className='flex min-w-0 items-center gap-2.5')
+                      span(className='grid size-[31px] shrink-0 place-items-center rounded-[9px] border border-[rgba(70,91,58,0.1)] bg-[#e9f1e4] text-[9px] font-extrabold tracking-[-0.03em] text-[#597249]' aria-hidden='true') #{row.original.account.slice(0, 2).toUpperCase()}
+                      div(className='[&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_b]:text-[#242824] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
                         b #{row.original.account}
                         small #{row.original.id}
                   elseif cell.column.id === 'contact'
-                    div.primary-secondary
+                    div(className='grid min-w-0 items-center gap-[3px] [&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_b]:text-[#242824] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
                       b #{row.original.contact}
                       small #{row.original.email}
                   elseif cell.column.id === 'status'
-                    span(className={statusClass(row.original.status)}) #{row.original.status}
+                    Badge(tone={row.original.status === 'Healthy' ? 'success' : row.original.status === 'Watching' ? 'warning' : row.original.status === 'At risk' ? 'danger' : 'info'}) #{row.original.status}
                   elseif cell.column.id === 'revenue'
-                    b.numeric #{formatCurrency(row.original.revenue)}
+                    b(className='font-mono text-[10px] font-[680] tabular-nums text-[#303530]') #{formatCurrency(row.original.revenue)}
                   elseif cell.column.id === 'health'
-                    div.health-cell
-                      span #{row.original.health}
-                      span.health-track(aria-hidden='true')
-                        span.health-fill(style={{ width: `${row.original.health}%` }})
+                    HealthMeter(value={row.original.health})
                   elseif cell.column.id === 'updatedAt'
-                    span.muted #{formatRelativeTime(row.original.updatedAt)}
+                    span(className='text-[#90968d]') #{formatRelativeTime(row.original.updatedAt)}
                   else
                     | #{String(cell.getValue() ?? '—')}
           empty
             tr
-              td.empty-state(colSpan={table.getVisibleLeafColumns().length})
+              td(className='h-[300px]! text-center! text-[#8b9188]! [&_b]:mb-[7px] [&_b]:block [&_b]:text-sm [&_b]:text-[#454a43] [&_span]:block' colSpan={table.getVisibleLeafColumns().length})
                 b No matching accounts
                 span Try a shorter query or clear the search.
 
-    footer.table-footer
-      div.page-size
+    footer(className='grid min-h-[50px] grid-cols-[1fr_auto_auto] items-center gap-5 border-t border-input/50 bg-sidebar px-4 py-[9px] text-[10px] font-semibold text-[#81877e] max-[680px]:grid-cols-[1fr_auto] [&_p]:m-0 [&_p:nth-child(2)]:text-center max-[680px]:[&_p:nth-child(2)]:hidden')
+      div(className='flex items-center gap-2')
         label(for='explorer-page-size') Rows
         select#explorer-page-size(
+          ~ className='h-8 rounded-md border border-input/50 bg-white py-0 pl-[9px] [&_svg]:ml-1 pr-2 text-[10px] text-[#555c53]'
           ~ value={String(table.state.pagination.pageSize)}
           ~ onChange={(event) => table.setPageSize(Number((event.currentTarget as HTMLSelectElement).value))}
           ~ )
@@ -169,9 +306,9 @@ section.table-example(aria-labelledby='explorer-heading')
           option(value='15') 15
           option(value='25') 25
           option(value='50') 50
-      p Page #{table.state.pagination.pageIndex + 1} of #{Math.max(1, table.getPageCount()).toLocaleString()}
-      div.pagination
-        button(type='button' aria-label='First page' disabled={!table.getCanPreviousPage()} onClick={() => table.firstPage()}) «
-        button(type='button' aria-label='Previous page' disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}) ‹
-        button(type='button' aria-label='Next page' disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}) ›
-        button(type='button' aria-label='Last page' disabled={!table.getCanNextPage()} onClick={() => table.lastPage()}) »
+      p(className='font-normal text-soft') Page #{table.state.pagination.pageIndex + 1} of #{Math.max(1, table.getPageCount()).toLocaleString()}
+      div(className='flex items-center rounded-md border border-input/50 divide-x divide-input/50 bg-background overflow-hidden')
+        Button(className='rounded-none disabled:opacity-40' variant='ghost' size='icon' aria-label='First page' disabled={!table.getCanPreviousPage()} onClick={() => table.firstPage()}) «
+        Button(className='rounded-none disabled:opacity-40' variant='ghost' size='icon' aria-label='Previous page' disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}) ‹
+        Button(className='rounded-none disabled:opacity-40' variant='ghost' size='icon' aria-label='Next page' disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}) ›
+        Button(className='rounded-none disabled:opacity-40' variant='ghost' size='icon' aria-label='Last page' disabled={!table.getCanNextPage()} onClick={() => table.lastPage()}) »

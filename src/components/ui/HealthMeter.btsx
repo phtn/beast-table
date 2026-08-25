@@ -1,0 +1,33 @@
+import type { JSX } from 'octane/jsx-runtime'
+
+module
+  type NativeDivProps = JSX.IntrinsicElements['div']
+
+  type Props = Omit<NativeDivProps, 'children' | 'class' | 'className'> & {
+    className?: NativeDivProps['className']
+    label?: string
+    max?: number
+    value: number
+  }
+
+props { className, label, max = 100, value, ...divProps }: Props
+setup
+  const normalizedValue = Math.max(0, Math.min(max, value))
+  const valuePercent = max <= 0 ? 0 : (normalizedValue / max) * 100
+
+div(
+  ~ {...divProps}
+  ~ className={[
+  ~   'inline-grid w-[88px] grid-cols-[22px_54px] items-center justify-end gap-2 font-mono text-[9px] tabular-nums text-[#626960]',
+  ~   className,
+  ~ ]}
+  ~ )
+  span #{label ?? normalizedValue.toFixed(0)}
+  span(
+    ~ className='block h-1 overflow-hidden rounded-full bg-[#e4e8e1]'
+    ~ role='progressbar'
+    ~ aria-valuemin={0}
+    ~ aria-valuemax={max}
+    ~ aria-valuenow={normalizedValue}
+    ~ )
+    span(className='block h-full rounded-[inherit] bg-[#80ad5f]' style={{ width: `${valuePercent}%` }})
