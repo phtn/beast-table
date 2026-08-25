@@ -1,11 +1,16 @@
 import { createColumnHelper, flexRender, functionalUpdate, useTable } from '@octanejs/tanstack-table'
 import type { PaginationState, SortingState } from '@octanejs/tanstack-table'
 import { parseAsBoolean, parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from '@octanejs/nuqs'
-import { useEffect, useMemo, useState } from 'octane'
+import { useEffect, useMemo, useState, useRef, useLayoutEffect } from 'octane'
 import { Badge, Button, Checkbox, HealthMeter, Input, Metric, Header } from './ui'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { formatCurrency, formatRelativeTime, prepareExplorerRows } from '../data'
 import type { ExplorerProgress, PerformanceRow } from '../data'
 import { explorerFeatures } from '../table-config'
+import {gsap} from 'gsap'
+import { useGSAP } from '@octanejs/gsap'
+import { TABLE_QUERY_LIMITS } from './ui/table/hyper/Parsers'
+
 
 module
   interface Props {
@@ -22,8 +27,44 @@ module
     total: number
   }
 
+  type RowIdAccessor<T extends RowData> = keyof T | ((row: T, index: number) => string | number | null | undefined)
+  interface LocalDataState<T extends RowData> {
+    source: T[]
+    value: T[]
+  }
+
+  const UNSAFE_ROW_IDS = new Set(['__proto__', 'constructor', 'prototype'])
+
+  const getFallbackRowIdValue = <T extends RowData>(row: T) => {
+    if (!row || typeof row !== 'object') {
+      return null
+    }
+
+    const record = row as Record<string, unknown>
+    return record._id ?? record.id ?? record.visitorId ?? record.fid ?? null
+  }
+
+  const resolveRowId = <T extends RowData>(row: T, index: number, rowIdAccessor: RowIdAccessor<T> | undefined) => {
+    const value =
+      typeof rowIdAccessor === 'function'
+        ? rowIdAccessor(row, index)
+        : rowIdAccessor
+          ? row[rowIdAccessor]
+          : getFallbackRowIdValue(row)
+
+    if (value === null || value === undefined) return String(index)
+
+    const rowId = String(value)
+    if (rowId.length === 0 || rowId.length > TABLE_QUERY_LIMITS.tokenCharacters || UNSAFE_ROW_IDS.has(rowId)) {
+      throw new Error(
+        `DataTable row id "${rowId.slice(0, 64)}" is empty, unsafe, or longer than ${TABLE_QUERY_LIMITS.tokenCharacters} characters.`
+      )
+    }
+    return rowId
+  }
+
   const columnHelper = createColumnHelper<typeof explorerFeatures, PerformanceRow>()
-  const explorerSortIds = ['account', 'contact', 'email', 'status', 'revenue', 'health', 'updatedAt'] as const
+  const explorerSortIds = ['account', 'contact', 'email', 'region', 'status', 'revenue', 'health', 'updatedAt'] as const
   const explorerQueryParsers = {
     q: parseAsString.withDefault(''),
     page: parseAsInteger.withDefault(1),
@@ -31,7 +72,7 @@ module
     sort: parseAsStringLiteral(explorerSortIds).withDefault('revenue'),
     desc: parseAsBoolean.withDefault(true),
   }
-  const explorerPageSizes = [10, 15, 25, 50]
+  const explorerPageSizes = [25, 100, 250, 1000]
   const columns = columnHelper.columns([
     columnHelper.display({
       id: 'select',
@@ -42,6 +83,7 @@ module
     columnHelper.accessor('account', { header: 'Account', sortFn: 'text' }),
     columnHelper.accessor('contact', { header: 'Owner', sortFn: 'text' }),
     columnHelper.accessor('email', { header: 'Email', sortFn: 'text' }),
+    columnHelper.accessor('region', { header: 'Region', sortFn: 'text' }),
     columnHelper.accessor('status', { header: 'Status', sortFn: 'text' }),
     columnHelper.accessor('revenue', { header: 'ARR', sortFn: 'basic' }),
     columnHelper.accessor('health', { header: 'Health', sortFn: 'basic' }),
@@ -67,7 +109,7 @@ setup
     explorerQueryParsers,
     { history: 'replace' },
   )
-  const pageSize = explorerPageSizes.includes(size) ? size : 15
+  const pageSize = explorerPageSizes.includes(size) ? size : 25
   const pagination = useMemo<PaginationState>(() => ({
     pageIndex: Math.max(0, page - 1),
     pageSize,
@@ -75,8 +117,108 @@ setup
   const sorting = useMemo<SortingState>(() => [
     { id: sort, desc },
   ], [sort, desc])
+
   const [processedRows, setProcessedRows] = useState<ReadonlyArray<PerformanceRow>>(rows)
   const [queryState, setQueryState] = useState<QueryState>(() => createInitialQueryState(rows.length))
+  const [draggedRowId, setDraggedRowId] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<{ position: RowDropPosition; rowId: string } | null>(null)
+  const draggedRowIdRef = useRef<string | null>(null)
+  const [enableRowReordering] = useState(true)
+  const [loading] = useState(false)
+  const [rowReorderPending, setRowReorderPending] = useState(false)
+  const [bulkAction] = useState('idle')
+  const [rowReorderDisabledReason] = useState<null>(null)
+  const canReorderRows = enableRowReordering && !loading && !rowReorderPending && bulkAction === 'idle' && rowReorderDisabledReason === null
+  const [rowIdAccessor] = useState<RowIdAccessor<PerformanceRow>>()
+  const getTableRowId = useCallback((row: T, index: number) => resolveRowId(row, index, rowIdAccessor), [rowIdAccessor])
+  const rowIds = useMemo(() => rows.map((row, index) => getTableRowId(row, index)), [getTableRowId, rows])
+  const availableRowIds = useMemo(() => new Set(rowIds), [rowIds])
+  const onRowReorder: (args: RowReorderArgs<T>) => void | Promise<void> = undefined
+  const onRowReorderError: (error: unknown) => void = undefined
+  const updateLocalData = useCallback(
+    (updater: (current: T[]) => T[]) => {
+      setLocalDataState((current) => {
+        const currentValue = current?.source === rows ? current.value :rows
+        return {
+          source: rows,
+          value: updater(currentValue)
+        }
+      })
+    },
+    [rows]
+  )
+
+  const clearRowDrag = useCallback(() => {
+    draggedRowIdRef.current = null
+    setDraggedRowId(null)
+    setDropTarget(null)
+  }, [])
+  const handleRowDragStart = useCallback(
+    (event: DragEvent<HTMLButtonElement>, rowId: string) => {
+      if (!canReorderRows) {
+        event.preventDefault()
+        return
+      }
+
+      draggedRowIdRef.current = rowId
+      setDraggedRowId(rowId)
+      setDropTarget(null)
+      event.dataTransfer.effectAllowed = 'move'
+      event.dataTransfer.setData('text/plain', rowId)
+    },
+    [canReorderRows]
+  )
+
+  const handleRowDragOver = useCallback((event: DragEvent<HTMLTableRowElement>, rowId: string) => {
+    const activeRowId = draggedRowIdRef.current
+
+      if (!canReorderRows || !activeRowId || activeRowId === rowId) {
+        return
+      }
+
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+      const position = getDropPosition(event)
+      setDropTarget((current) =>
+        current?.rowId === rowId && current.position === position ? current : { position, rowId }
+      )
+    },
+    [canReorderRows]
+  )
+
+  const handleRowDrop = useCallback(
+    (event: DragEvent<HTMLTableRowElement>, targetRowId: string) => {
+      const activeRowId = draggedRowIdRef.current
+
+      event.preventDefault()
+      clearRowDrag()
+
+      if (!canReorderRows || !activeRowId) {
+        return
+      }
+
+      const result = reorderRows(rows, getTableRowId, activeRowId, targetRowId, getDropPosition(event))
+
+      if (!result) {
+        return
+      }
+
+      updateLocalData(() => result.rows)
+
+      if (!onRowReorder) {
+        return
+      }
+
+      setRowReorderPending(true)
+      void Promise.resolve(onRowReorder(result))
+        .catch((error: unknown) => {
+          setLocalDataState(null)
+          onRowReorderError?.(error)
+        })
+        .finally(() => setRowReorderPending(false))
+    },
+    [canReorderRows, clearRowDrag, getTableRowId, onRowReorder, onRowReorderError, rows, updateLocalData]
+  )
 
   useEffect(() => {
     const controller = new AbortController()
@@ -129,6 +271,61 @@ setup
     const pageStart = pagination.pageIndex * pagination.pageSize
     return processedRows.slice(pageStart, pageStart + pagination.pageSize)
   }, [processedRows, pagination.pageIndex, pagination.pageSize])
+
+  const rowMotionRootRef = useRef<HTMLTableSectionElement>(null)
+
+  useLayoutEffect(() => {
+      const root = rowMotionRootRef.current
+
+      if (!enableRowReordering || !root) {
+        return
+      }
+
+      const rows = gsap.utils.toArray<HTMLTableRowElement>('[data-reorder-row-id]', root)
+
+      if (rows.length === 0) {
+        return
+      }
+
+      const prefersReducedMotion =
+        typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+      if (prefersReducedMotion) {
+        gsap.set(rows, { clearProps: 'transform,opacity' })
+        return
+      }
+
+      const activeIndex = draggedRowId ? rows.findIndex((row) => row.dataset.reorderRowId === draggedRowId) : -1
+      const targetIndex = dropTarget ? rows.findIndex((row) => row.dataset.reorderRowId === dropTarget.rowId) : -1
+
+      gsap.killTweensOf(rows)
+
+      for (const [rowIndex, row] of rows.entries()) {
+        const isDraggedRow = rowIndex === activeIndex
+        const y =
+          draggedRowId && dropTarget
+            ? getRowDragOffset({
+                activeIndex,
+                rowIndex,
+                targetIndex
+              })
+            : 0
+
+        gsap.to(row, {
+          y,
+          scale: isDraggedRow ? 1.012 : y === 0 ? 1 : 0.998,
+          opacity: isDraggedRow ? 0.82 : 1,
+          duration: isDraggedRow ? 0.16 : 0.22,
+          ease: 'power2.out',
+          overwrite: true,
+          clearProps: draggedRowId ? undefined : 'transform,opacity'
+        })
+      }
+
+      return () => {
+        gsap.killTweensOf(rows)
+      }
+    }, [draggedRowId, dropTarget, enableRowReordering])
 
   const table = useTable(
     {
@@ -229,12 +426,12 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
 
   div(className='border-t border-input/50')
     div(className='max-h-[min(590px,63vh)] w-full overflow-auto scrollbar-track-sidebar scrollbar-thumb-octane scrollbar-thin scroll-smooth')
-      table(className='w-full min-w-[1180px] table-auto border-separate border-spacing-0 whitespace-nowrap [&_th]:sticky [&_th]:top-0 [&_th]:z-[2] [&_th]:h-[40px] [&_th]:border-b [&_th]:border-input/40 [&_th]:bg-sidebar [&_th]:px-4 [&_th]:py-0 [&_th]:text-left [&_th]:text-2xs [&_th]:font-extrabold [&_th]:uppercase [&_th]:tracking-[0.1em] [&_th]:text-muted-foreground [&_th]:backdrop-blur-sm [&_td]:h-[54px] [&_td]:overflow-hidden [&_td]:border-b [&_td]:border-sidebar [&_td]:px-4 [&_td]:py-2 [&_td]:text-xs [&_td]:text-ellipsis [&_td]:text-muted-foreground [&_tbody_tr]:bg-background [&_tbody_tr]:transition-colors [&_tbody_tr]:duration-100 [&_tbody_tr:hover]:bg-sidebar/60 [&_tbody_tr:last-child_td]:border-b-0')
-        thead
+      Table(className='min-w-[1180px]')
+        TableHeader
           each headerGroup in table.getHeaderGroups() key headerGroup.id
-            tr
+            TableRow
               each header in headerGroup.headers key header.id
-                th(
+                TableHead(
                   ~ className={header.column.id === 'select' ? 'w-12 pr-2! pl-[18px]! text-center!' : ''}
                   ~ scope='col'
                   ~ )
@@ -255,11 +452,11 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
                       ~ )
                       span #{header.isPlaceholder ? '' : flexRender(header.column.columnDef.header, header.getContext())}
                       span(className='text-2xs text-muted-foreground' aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
-        tbody
+        TableBody(ref={rowMotionRootRef})
           each row in visibleRows key row.id
-            tr(className={row.getIsSelected() ? 'bg-sidebar!' : ''})
+            TableRow(className={row.getIsSelected() ? 'bg-sidebar!' : ''})
               each cell in row.getVisibleCells() key cell.id
-                td(className={cell.column.id === 'select' ? 'w-12 pr-2! pl-[18px]! text-center!' : cell.column.id === 'revenue' || cell.column.id === 'health' ? 'text-right' : ''})
+                TableCell(className={cell.column.id === 'select' ? 'w-12 pr-2! pl-[18px]! text-center!' : cell.column.id === 'revenue' || cell.column.id === 'health' ? 'text-right' : ''})
                   if cell.column.id === 'select'
                     Checkbox(
                       ~ aria-label={`Select ${row.original.account}`}
@@ -275,7 +472,10 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
                   elseif cell.column.id === 'contact'
                     div(className='grid min-w-0 items-center gap-[3px] [&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_b]:text-[#242824] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
                       b #{row.original.contact}
-                      small #{row.original.email}
+                  elseif cell.column.id === 'email'
+                    small #{row.original.email}
+                  elseif cell.column.id === 'region'
+                    small #{row.original.region}
                   elseif cell.column.id === 'status'
                     Badge(tone={row.original.status === 'Healthy' ? 'success' : row.original.status === 'Watching' ? 'warning' : row.original.status === 'At risk' ? 'danger' : 'info'}) #{row.original.status}
                   elseif cell.column.id === 'revenue'
@@ -287,8 +487,8 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
                   else
                     | #{String(cell.getValue() ?? '—')}
           empty
-            tr
-              td(className='h-[300px]! text-center! text-[#8b9188]! [&_b]:mb-[7px] [&_b]:block [&_b]:text-sm [&_b]:text-[#454a43] [&_span]:block' colSpan={table.getVisibleLeafColumns().length})
+            TableRow
+              TableCell(className='h-[300px]! text-center! text-[#8b9188]! [&_b]:mb-[7px] [&_b]:block [&_b]:text-sm [&_b]:text-[#454a43] [&_span]:block' colSpan={table.getVisibleLeafColumns().length})
                 b No matching accounts
                 span Try a shorter query or clear the search.
 

@@ -14,7 +14,7 @@ export const regions = [
   'Africa',
   'South Asia',
   'Southeast Asia',
-  'Oceania',
+  'Oceania'
 ] as const
 
 export const industries = [
@@ -25,7 +25,7 @@ export const industries = [
   'Climate',
   'Security',
   'Media',
-  'Developer tools',
+  'Developer tools'
 ] as const
 
 export const plans = ['Core', 'Scale', 'Pro', 'Enterprise'] as const
@@ -41,7 +41,7 @@ export interface PerformanceRow {
   account: string
   contact: string
   email: string
-  region: Region
+  region: string
   industry: Industry
   plan: Plan
   status: AccountStatus
@@ -187,10 +187,8 @@ const runSeed = async (): Promise<SeedRowsResult> => {
         id: `AC-${String(index + 1).padStart(6, '0')}`,
         account: faker.company.name(),
         contact: `${firstName} ${lastName}`,
-        email: faker.internet
-          .email({ firstName, lastName, provider: 'example.dev' })
-          .toLowerCase(),
-        region: faker.helpers.arrayElement(regions),
+        email: faker.internet.email({ firstName, lastName, provider: 'example.dev' }).toLowerCase(),
+        region: faker.location.continent(),
         industry: faker.helpers.arrayElement(industries),
         plan: faker.helpers.arrayElement(plans),
         status: faker.helpers.arrayElement(statuses),
@@ -199,7 +197,7 @@ const runSeed = async (): Promise<SeedRowsResult> => {
         health: faker.number.int({ min: 38, max: 100 }),
         latency: faker.number.int({ min: 18, max: 680 }),
         events: faker.number.int({ min: 300, max: 48_000 }),
-        updatedAt: faker.date.recent({ days: 30 }).getTime(),
+        updatedAt: faker.date.recent({ days: 30 }).getTime()
       }
     }
 
@@ -207,7 +205,7 @@ const runSeed = async (): Promise<SeedRowsResult> => {
       completed: chunkEnd,
       elapsedMs: performance.now() - startedAt,
       phase: 'seeding',
-      total: ROW_COUNT,
+      total: ROW_COUNT
     })
 
     if (chunkEnd < ROW_COUNT) await yieldToMain()
@@ -216,21 +214,19 @@ const runSeed = async (): Promise<SeedRowsResult> => {
   return { elapsedMs: performance.now() - startedAt, rows }
 }
 
-export const seedPerformanceRows = async ({
-  onProgress,
-  signal,
-}: SeedRowsOptions = {}): Promise<SeedRowsResult> => {
+export const seedPerformanceRows = async ({ onProgress, signal }: SeedRowsOptions = {}): Promise<SeedRowsResult> => {
   assertNotAborted(signal)
 
   if (seedCache !== null) {
     return seedCache
   }
 
-  const listener = onProgress === undefined
-    ? undefined
-    : (progress: SeedProgress) => {
-        if (signal?.aborted !== true) onProgress(progress)
-      }
+  const listener =
+    onProgress === undefined
+      ? undefined
+      : (progress: SeedProgress) => {
+          if (signal?.aborted !== true) onProgress(progress)
+        }
 
   if (listener !== undefined) {
     seedProgressListeners.add(listener)
@@ -275,9 +271,7 @@ const publishAnalyticsProgress = (progress: AnalyticsProgress) => {
   for (const listener of analyticsProgressListeners) listener(progress)
 }
 
-const runAnalyticsIndex = async (
-  source: ReadonlyArray<PerformanceRow>,
-): Promise<AnalyticsRowsResult> => {
+const runAnalyticsIndex = async (source: ReadonlyArray<PerformanceRow>): Promise<AnalyticsRowsResult> => {
   const startedAt = performance.now()
   const buckets = new Map<string, AnalyticsAccumulator>()
 
@@ -296,7 +290,7 @@ const runAnalyticsIndex = async (
           industry: row.industry,
           region: row.region,
           revenue: row.revenue,
-          seats: row.seats,
+          seats: row.seats
         })
       } else {
         existing.accounts += 1
@@ -310,7 +304,7 @@ const runAnalyticsIndex = async (
       completed: chunkEnd,
       elapsedMs: performance.now() - startedAt,
       phase: 'indexing',
-      total: source.length,
+      total: source.length
     })
 
     if (chunkEnd < source.length) await yieldToMain()
@@ -323,19 +317,19 @@ const runAnalyticsIndex = async (
     industry: bucket.industry,
     region: bucket.region,
     revenue: bucket.revenue,
-    seats: bucket.seats,
+    seats: bucket.seats
   }))
 
   return {
     elapsedMs: performance.now() - startedAt,
     rows,
-    sourceRowCount: source.length,
+    sourceRowCount: source.length
   }
 }
 
 export const prepareAnalyticsRows = async (
   source: ReadonlyArray<PerformanceRow>,
-  { onProgress, signal }: AnalyticsRowsOptions = {},
+  { onProgress, signal }: AnalyticsRowsOptions = {}
 ): Promise<AnalyticsRowsResult> => {
   assertNotAborted(signal)
 
@@ -356,15 +350,16 @@ export const prepareAnalyticsRows = async (
           analyticsTask = null
           latestAnalyticsProgress = null
           throw error
-        }),
+        })
     }
   }
 
-  const listener = onProgress === undefined
-    ? undefined
-    : (progress: AnalyticsProgress) => {
-        if (signal?.aborted !== true) onProgress(progress)
-      }
+  const listener =
+    onProgress === undefined
+      ? undefined
+      : (progress: AnalyticsProgress) => {
+          if (signal?.aborted !== true) onProgress(progress)
+        }
 
   if (listener !== undefined) {
     analyticsProgressListeners.add(listener)
@@ -386,62 +381,59 @@ export const prepareAnalyticsRows = async (
   }
 }
 
-const explorerCaches = new WeakMap<
-  ReadonlyArray<PerformanceRow>,
-  Map<string, ExplorerRowsResult>
->()
+const explorerCaches = new WeakMap<ReadonlyArray<PerformanceRow>, Map<string, ExplorerRowsResult>>()
 let explorerTask: ExplorerTask | null = null
 
 const normalizeExplorerQuery = (query: string) => query.trim().toLocaleLowerCase()
 
-const getExplorerKey = (
-  query: string,
-  sorting: ReadonlyArray<ExplorerSort>,
-) => `${normalizeExplorerQuery(query)}\u0000${sorting
-  .map((sort) => `${sort.id}:${sort.desc ? 'desc' : 'asc'}`)
-  .join(',')}`
+const getExplorerKey = (query: string, sorting: ReadonlyArray<ExplorerSort>) =>
+  `${normalizeExplorerQuery(query)}\u0000${sorting.map((sort) => `${sort.id}:${sort.desc ? 'desc' : 'asc'}`).join(',')}`
 
 const matchesExplorerQuery = (row: PerformanceRow, query: string) => {
   if (query.length === 0) return true
 
-  return row.account.toLocaleLowerCase().includes(query)
-    || row.contact.toLocaleLowerCase().includes(query)
-    || row.email.toLocaleLowerCase().includes(query)
-    || row.region.toLocaleLowerCase().includes(query)
-    || row.plan.toLocaleLowerCase().includes(query)
-    || row.status.toLocaleLowerCase().includes(query)
-    || String(row.revenue).includes(query)
-    || String(row.health).includes(query)
+  return (
+    row.account.toLocaleLowerCase().includes(query) ||
+    row.contact.toLocaleLowerCase().includes(query) ||
+    row.email.toLocaleLowerCase().includes(query) ||
+    row.region.toLocaleLowerCase().includes(query) ||
+    row.plan.toLocaleLowerCase().includes(query) ||
+    row.status.toLocaleLowerCase().includes(query) ||
+    String(row.revenue).includes(query) ||
+    String(row.health).includes(query)
+  )
 }
 
 const getExplorerSortValue = (row: PerformanceRow, id: string): string | number => {
   switch (id) {
-    case 'account': return row.account
-    case 'contact': return row.contact
-    case 'email': return row.email
-    case 'region': return row.region
-    case 'plan': return row.plan
-    case 'status': return row.status
-    case 'revenue': return row.revenue
-    case 'health': return row.health
-    case 'updatedAt': return row.updatedAt
-    default: return row.id
+    case 'account':
+      return row.account
+    case 'contact':
+      return row.contact
+    case 'email':
+      return row.email
+    case 'region':
+      return row.region
+    case 'plan':
+      return row.plan
+    case 'status':
+      return row.status
+    case 'revenue':
+      return row.revenue
+    case 'health':
+      return row.health
+    case 'updatedAt':
+      return row.updatedAt
+    default:
+      return row.id
   }
 }
 
-const compareExplorerRows = (
-  left: PerformanceRow,
-  right: PerformanceRow,
-  sorting: ReadonlyArray<ExplorerSort>,
-) => {
+const compareExplorerRows = (left: PerformanceRow, right: PerformanceRow, sorting: ReadonlyArray<ExplorerSort>) => {
   for (const sort of sorting) {
     const leftValue = getExplorerSortValue(left, sort.id)
     const rightValue = getExplorerSortValue(right, sort.id)
-    const comparison = leftValue === rightValue
-      ? 0
-      : leftValue < rightValue
-        ? -1
-        : 1
+    const comparison = leftValue === rightValue ? 0 : leftValue < rightValue ? -1 : 1
 
     if (comparison !== 0) return sort.desc ? -comparison : comparison
   }
@@ -454,7 +446,7 @@ const sortExplorerRows = async (
   sorting: ReadonlyArray<ExplorerSort>,
   startedAt: number,
   signal: AbortSignal,
-  publish: (progress: ExplorerProgress) => void,
+  publish: (progress: ExplorerProgress) => void
 ) => {
   if (sorting.length === 0 || input.length < 2) return input
 
@@ -474,9 +466,8 @@ const sortExplorerRows = async (
 
       for (let outputIndex = left; outputIndex < right; outputIndex += 1) {
         if (
-          leftIndex < middle
-          && (rightIndex >= right
-            || compareExplorerRows(source[leftIndex], source[rightIndex], sorting) <= 0)
+          leftIndex < middle &&
+          (rightIndex >= right || compareExplorerRows(source[leftIndex], source[rightIndex], sorting) <= 0)
         ) {
           target[outputIndex] = source[leftIndex]
           leftIndex += 1
@@ -494,7 +485,7 @@ const sortExplorerRows = async (
           elapsedMs: performance.now() - startedAt,
           matched: input.length,
           phase: 'sorting',
-          total,
+          total
         })
         completedAtLastYield = completed
         assertNotAborted(signal)
@@ -512,7 +503,7 @@ const sortExplorerRows = async (
     elapsedMs: performance.now() - startedAt,
     matched: input.length,
     phase: 'sorting',
-    total,
+    total
   })
 
   return source
@@ -523,17 +514,13 @@ const runExplorerQuery = async (
   query: string,
   sorting: ReadonlyArray<ExplorerSort>,
   signal: AbortSignal,
-  publish: (progress: ExplorerProgress) => void,
+  publish: (progress: ExplorerProgress) => void
 ): Promise<ExplorerRowsResult> => {
   const startedAt = performance.now()
   const normalizedQuery = normalizeExplorerQuery(query)
   const filteredRows: PerformanceRow[] = []
 
-  for (
-    let chunkStart = 0;
-    chunkStart < source.length;
-    chunkStart += EXPLORER_FILTER_CHUNK_SIZE
-  ) {
+  for (let chunkStart = 0; chunkStart < source.length; chunkStart += EXPLORER_FILTER_CHUNK_SIZE) {
     const chunkEnd = Math.min(chunkStart + EXPLORER_FILTER_CHUNK_SIZE, source.length)
 
     for (let index = chunkStart; index < chunkEnd; index += 1) {
@@ -546,31 +533,22 @@ const runExplorerQuery = async (
       elapsedMs: performance.now() - startedAt,
       matched: filteredRows.length,
       phase: 'filtering',
-      total: source.length,
+      total: source.length
     })
 
     assertNotAborted(signal)
     if (chunkEnd < source.length) await yieldToMain()
   }
 
-  const orderedRows = await sortExplorerRows(
-    filteredRows,
-    sorting,
-    startedAt,
-    signal,
-    publish,
-  )
+  const orderedRows = await sortExplorerRows(filteredRows, sorting, startedAt, signal, publish)
 
   return {
     elapsedMs: performance.now() - startedAt,
-    rows: orderedRows,
+    rows: orderedRows
   }
 }
 
-const getCachedExplorerRows = (
-  source: ReadonlyArray<PerformanceRow>,
-  key: string,
-) => {
+const getCachedExplorerRows = (source: ReadonlyArray<PerformanceRow>, key: string) => {
   const cache = explorerCaches.get(source)
   const result = cache?.get(key)
 
@@ -582,11 +560,7 @@ const getCachedExplorerRows = (
   return result
 }
 
-const cacheExplorerRows = (
-  source: ReadonlyArray<PerformanceRow>,
-  key: string,
-  result: ExplorerRowsResult,
-) => {
+const cacheExplorerRows = (source: ReadonlyArray<PerformanceRow>, key: string, result: ExplorerRowsResult) => {
   const cache = explorerCaches.get(source) ?? new Map<string, ExplorerRowsResult>()
   cache.delete(key)
   cache.set(key, result)
@@ -604,23 +578,19 @@ const createExplorerTask = (
   source: ReadonlyArray<PerformanceRow>,
   key: string,
   query: string,
-  sorting: ReadonlyArray<ExplorerSort>,
+  sorting: ReadonlyArray<ExplorerSort>
 ) => {
   const controller = new AbortController()
   const listeners = new Set<(progress: ExplorerProgress) => void>()
   let record: ExplorerTask
 
   const task = Promise.resolve()
-    .then(() => runExplorerQuery(
-      source,
-      query,
-      sorting,
-      controller.signal,
-      (progress) => {
+    .then(() =>
+      runExplorerQuery(source, query, sorting, controller.signal, (progress) => {
         record.latestProgress = progress
         for (const listener of listeners) listener(progress)
-      },
-    ))
+      })
+    )
     .then((result) => {
       cacheExplorerRows(source, key, result)
       return result
@@ -636,7 +606,7 @@ const createExplorerTask = (
     latestProgress: null,
     listeners,
     source,
-    task,
+    task
   }
 
   return record
@@ -644,12 +614,7 @@ const createExplorerTask = (
 
 export const prepareExplorerRows = async (
   source: ReadonlyArray<PerformanceRow>,
-  {
-    onProgress,
-    query = '',
-    signal,
-    sorting = [{ id: 'revenue', desc: true }],
-  }: ExplorerRowsOptions = {},
+  { onProgress, query = '', signal, sorting = [{ id: 'revenue', desc: true }] }: ExplorerRowsOptions = {}
 ): Promise<ExplorerRowsResult> => {
   assertNotAborted(signal)
 
@@ -663,11 +628,12 @@ export const prepareExplorerRows = async (
   }
 
   const activeTask = explorerTask
-  const listener = onProgress === undefined
-    ? undefined
-    : (progress: ExplorerProgress) => {
-        if (signal?.aborted !== true) onProgress(progress)
-      }
+  const listener =
+    onProgress === undefined
+      ? undefined
+      : (progress: ExplorerProgress) => {
+          if (signal?.aborted !== true) onProgress(progress)
+        }
 
   if (listener !== undefined) {
     activeTask.listeners.add(listener)
@@ -693,13 +659,13 @@ export const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 0
   }).format(value)
 
 export const formatCompact = (value: number) =>
   new Intl.NumberFormat('en-US', {
     notation: 'compact',
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 1
   }).format(value)
 
 export const formatRelativeTime = (timestamp: number) => {
