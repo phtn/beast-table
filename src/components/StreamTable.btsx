@@ -1,0 +1,215 @@
+import { useEffect, useState } from 'octane'
+import { createColumnHelper, flexRender, useTable } from '@octanejs/tanstack-table'
+import { formatCompact, formatRelativeTime, statusClass, streamRows, STREAM_ROW_COUNT } from '../data'
+import type { PerformanceRow } from '../data'
+import { streamFeatures } from '../table-config'
+
+module
+  const columnHelper = createColumnHelper<typeof streamFeatures, PerformanceRow>()
+  const columns = columnHelper.columns([
+    columnHelper.accessor('account', {
+      header: 'Signal',
+      sortFn: 'text',
+      size: 250,
+      minSize: 190,
+      enableHiding: false,
+    }),
+    columnHelper.accessor('status', { header: 'State', sortFn: 'text', size: 130 }),
+    columnHelper.accessor('latency', { header: 'Latency', sortFn: 'basic', size: 120 }),
+    columnHelper.accessor('events', { header: 'Events', sortFn: 'basic', size: 120 }),
+    columnHelper.accessor('region', { header: 'Region', sortFn: 'text', size: 160 }),
+    columnHelper.accessor('plan', { header: 'Plan', sortFn: 'text', size: 120 }),
+    columnHelper.accessor('health', { header: 'Health', sortFn: 'basic', size: 150 }),
+    columnHelper.accessor('updatedAt', { header: 'Last event', sortFn: 'basic', size: 130 }),
+  ])
+
+setup
+  const [rows, setRows] = useState<PerformanceRow[]>(() => streamRows)
+  const [isLive, setIsLive] = useState(false)
+  const [pulse, setPulse] = useState(0)
+  const [lastBurstMs, setLastBurstMs] = useState(0)
+
+  const table = useTable(
+    {
+      key: 'live-stream',
+      features: streamFeatures,
+      data: rows,
+      columns,
+      getRowId: (row) => row.id,
+      columnResizeMode: 'onChange',
+      initialState: {
+        pagination: { pageIndex: 0, pageSize: 20 },
+        sorting: [{ id: 'updatedAt', desc: true }],
+        columnVisibility: { region: false },
+      },
+    },
+    (state) => ({
+      columnResizing: state.columnResizing,
+      columnSizing: state.columnSizing,
+      columnVisibility: state.columnVisibility,
+      pagination: state.pagination,
+      sorting: state.sorting,
+    }),
+  )
+
+  const runBurst = () => {
+    const startedAt = performance.now()
+    const now = Date.now()
+    const nextRows = rows.map((row, index) =>
+      index % 12 === pulse % 12
+        ? {
+            ...row,
+            latency: 18 + ((row.latency * 7 + index) % 640),
+            events: row.events + 1 + (index % 21),
+            health: Math.max(32, Math.min(100, row.health + (index % 3) - 1)),
+            updatedAt: now,
+          }
+        : row,
+    )
+    setRows(nextRows)
+    setPulse((value) => value + 1)
+    setLastBurstMs(performance.now() - startedAt)
+  }
+
+  useEffect(() => {
+    if (!isLive) return
+
+    const timer = window.setInterval(() => {
+      const now = Date.now()
+      const phase = Math.floor(now / 900) % 120
+      setRows((currentRows) =>
+        currentRows.map((row, index) =>
+          index % 120 === phase
+            ? {
+                ...row,
+                latency: 18 + ((row.latency * 5 + index) % 640),
+                events: row.events + 1,
+                updatedAt: now,
+              }
+            : row,
+        ),
+      )
+      setPulse((value) => value + 1)
+    }, 900)
+
+    return () => window.clearInterval(timer)
+  }, [isLive])
+
+  const modelStartedAt = performance.now()
+  const visibleRows = table.getRowModel().rows
+  const modelDurationMs = performance.now() - modelStartedAt
+  const eventColumn = table.getColumn('events')
+  const regionColumn = table.getColumn('region')
+  const planColumn = table.getColumn('plan')
+
+section.table-example(aria-labelledby='stream-heading')
+  header.example-heading
+    div
+      p.eyebrow Update + resize + visibility
+      h2(className='text-xl!') Streaming
+      p.example-description Re-sort a changing 12k-row feed, resize columns in place, and keep DOM work bounded to 20 rows.
+    div.metric-row(aria-label='Stream performance')
+      span.metric
+        b #{STREAM_ROW_COUNT.toLocaleString()}
+        | rows
+      span.metric
+        b #{pulse.toLocaleString()}
+        | pulses
+      span.metric.metric-accent
+        b #{modelDurationMs.toFixed(2)}ms
+        | model
+
+  div.table-toolbar.stream-toolbar
+    div.live-controls
+      button(
+        ~ type='button'
+        ~ aria-pressed={isLive}
+        ~ className={isLive ? 'live-button active' : 'live-button'}
+        ~ onClick={() => setIsLive(!isLive)}
+        ~ )
+        span.live-dot(aria-hidden='true')
+        | #{isLive ? 'Streaming' : 'Start stream'}
+      button.secondary-button(type='button' onClick={runBurst}) Update 1,000 rows
+      if lastBurstMs > 0
+        span.burst-time #{lastBurstMs.toFixed(2)}ms mutation
+    div.column-controls(aria-label='Visible columns')
+      span Columns
+      button(
+        ~ type='button'
+        ~ aria-pressed={eventColumn.getIsVisible()}
+        ~ className={eventColumn.getIsVisible() ? 'column-chip active' : 'column-chip'}
+        ~ onClick={() => eventColumn.toggleVisibility()}
+        ~ ) Events
+      button(
+        ~ type='button'
+        ~ aria-pressed={regionColumn.getIsVisible()}
+        ~ className={regionColumn.getIsVisible() ? 'column-chip active' : 'column-chip'}
+        ~ onClick={() => regionColumn.toggleVisibility()}
+        ~ ) Region
+      button(
+        ~ type='button'
+        ~ aria-pressed={planColumn.getIsVisible()}
+        ~ className={planColumn.getIsVisible() ? 'column-chip active' : 'column-chip'}
+        ~ onClick={() => planColumn.toggleVisibility()}
+        ~ ) Plan
+
+  div.table-frame
+    div.table-scroll
+      table.data-table.stream-table(style={{ width: `${table.getTotalSize()}px` }})
+        thead
+          each headerGroup in table.getHeaderGroups() key headerGroup.id
+            tr
+              each header in headerGroup.headers key header.id
+                th(scope='col' style={{ width: `${header.getSize()}px` }})
+                  button.sort-button(
+                    ~ type='button'
+                    ~ disabled={!header.column.getCanSort()}
+                    ~ onClick={header.column.getToggleSortingHandler()}
+                    ~ )
+                    span #{header.isPlaceholder ? '' : flexRender(header.column.columnDef.header, header.getContext())}
+                    span.sort-mark(aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
+                  if header.column.getCanResize()
+                    button.column-resizer(
+                      ~ type='button'
+                      ~ aria-label={`Resize ${header.column.id} column`}
+                      ~ className={header.column.getIsResizing() ? 'active:cursor-col-resize' : 'column-resizer'}
+                      ~ onMouseDown={header.getResizeHandler()}
+                      ~ onTouchStart={header.getResizeHandler()}
+                      ~ onDoubleClick={() => header.column.resetSize()}
+                      ~ )
+        tbody
+          each row in visibleRows key row.id
+            tr
+              each cell in row.getVisibleCells() key cell.id
+                td(
+                  ~ className={cell.column.id === 'latency' || cell.column.id === 'events' || cell.column.id === 'health' ? 'numeric-cell' : ''}
+                  ~ style={{ width: `${cell.column.getSize()}px` }}
+                  ~ )
+                  if cell.column.id === 'account'
+                    div.signal-cell
+                      span.signal-indicator(className={row.original.latency > 420 ? 'signal-indicator hot' : row.original.latency < 120 ? 'signal-indicator fast' : 'signal-indicator'})
+                      div.primary-secondary
+                        b #{row.original.account}
+                        small #{row.original.id}
+                  elseif cell.column.id === 'status'
+                    span(className={statusClass(row.original.status)}) #{row.original.status}
+                  elseif cell.column.id === 'latency'
+                    b(className={row.original.latency > 420 ? 'numeric latency-hot' : 'numeric'}) #{row.original.latency}ms
+                  elseif cell.column.id === 'events'
+                    span.numeric #{formatCompact(row.original.events)}
+                  elseif cell.column.id === 'health'
+                    div.health-cell
+                      span #{row.original.health}
+                      span.health-track(aria-hidden='true')
+                        span.health-fill(style={{ width: `${row.original.health}%` }})
+                  elseif cell.column.id === 'updatedAt'
+                    span.muted #{formatRelativeTime(row.original.updatedAt)}
+                  else
+                    | #{String(cell.getValue() ?? '—')}
+
+    footer.table-footer
+      p #{table.getVisibleLeafColumns().length} visible columns · drag headers to resize
+      p Page #{table.state.pagination.pageIndex + 1} of #{Math.max(1, table.getPageCount()).toLocaleString()}
+      div.pagination
+        button(type='button' aria-label='Previous page' disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}) ‹
+        button(type='button' aria-label='Next page' disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}) ›

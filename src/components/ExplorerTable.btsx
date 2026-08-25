@@ -1,0 +1,177 @@
+import { createColumnHelper, flexRender, useTable } from '@octanejs/tanstack-table'
+import { formatCurrency, formatRelativeTime, performanceRows, ROW_COUNT, seedDurationMs, statusClass } from '../data'
+import type { PerformanceRow } from '../data'
+import { explorerFeatures } from '../table-config'
+
+module
+  const columnHelper = createColumnHelper<typeof explorerFeatures, PerformanceRow>()
+  const columns = columnHelper.columns([
+    columnHelper.display({
+      id: 'select',
+      header: 'Select',
+      enableHiding: false,
+      enableSorting: false,
+    }),
+    columnHelper.accessor('account', { header: 'Account', sortFn: 'text' }),
+    columnHelper.accessor('contact', { header: 'Owner', sortFn: 'text' }),
+    columnHelper.accessor('email', { header: 'Email', sortFn: 'text' }),
+    columnHelper.accessor('region', { header: 'Region', sortFn: 'text' }),
+    columnHelper.accessor('plan', { header: 'Plan', sortFn: 'text' }),
+    columnHelper.accessor('status', { header: 'Status', sortFn: 'text' }),
+    columnHelper.accessor('revenue', { header: 'ARR', sortFn: 'basic' }),
+    columnHelper.accessor('health', { header: 'Health', sortFn: 'basic' }),
+    columnHelper.accessor('updatedAt', {
+      header: 'Updated',
+      sortFn: 'basic',
+      enableGlobalFilter: false,
+    }),
+  ])
+
+setup
+  const table = useTable(
+    {
+      key: 'account-explorer',
+      features: explorerFeatures,
+      data: performanceRows,
+      columns,
+      globalFilterFn: 'includesString',
+      getColumnCanGlobalFilter: (column) => column.id !== 'select' && column.id !== 'updatedAt',
+      getRowId: (row) => row.id,
+      initialState: {
+        pagination: { pageIndex: 0, pageSize: 15 },
+        sorting: [{ id: 'revenue', desc: true }],
+        columnVisibility: { email: false },
+      },
+    },
+    (state) => ({
+      globalFilter: state.globalFilter,
+      pagination: state.pagination,
+      rowSelection: state.rowSelection,
+      sorting: state.sorting,
+    }),
+  )
+  const modelStartedAt = performance.now()
+  const visibleRows = table.getRowModel().rows
+  const modelDurationMs = performance.now() - modelStartedAt
+  const filteredCount = table.getFilteredRowModel().rows.length
+  const selectedCount = Object.keys(table.state.rowSelection).length
+  const query = String(table.state.globalFilter ?? '')
+
+section.table-example(aria-labelledby='explorer-heading')
+  header.example-heading
+    div
+      p.eyebrow Search + sort + select
+      h2(className='text-xl!') Account Explorer
+      p.example-description Scan, rank, and select across the full seeded dataset. Only the active page reaches the DOM.
+    div.metric-row(aria-label='Performance metrics')
+      span.metric
+        b #{ROW_COUNT.toLocaleString()}
+        | rows
+      span.metric
+        b #{seedDurationMs.toFixed(0)}ms
+        | seeded
+      span.metric.metric-accent
+        b #{modelDurationMs.toFixed(2)}ms
+        | model
+
+  div.table-toolbar
+    label.search-field
+      span.sr-only Search all accounts
+      span.search-icon(aria-hidden='true') ⌕
+      input(
+        ~ type='search'
+        ~ value={query}
+        ~ placeholder='Search account, owner, region…'
+        ~ onInput={(event) => table.setGlobalFilter((event.currentTarget as HTMLInputElement).value)}
+        ~ )
+      if query.length > 0
+        button.clear-search(type='button' aria-label='Clear search' onClick={() => table.setGlobalFilter('')}) ×
+    div.toolbar-summary
+      span #{filteredCount.toLocaleString()} results
+      span.divider-dot(aria-hidden='true') ·
+      span #{selectedCount} selected
+
+  div.table-frame
+    div.table-scroll
+      table.data-table
+        thead
+          each headerGroup in table.getHeaderGroups() key headerGroup.id
+            tr
+              each header in headerGroup.headers key header.id
+                th(
+                  ~ className={header.column.id === 'select' ? 'select-cell' : ''}
+                  ~ scope='col'
+                  ~ )
+                  if header.column.id === 'select'
+                    input(
+                      ~ type='checkbox'
+                      ~ aria-label='Select all rows on this page'
+                      ~ checked={table.getIsAllPageRowsSelected()}
+                      ~ onChange={table.getToggleAllPageRowsSelectedHandler()}
+                      ~ )
+                  else
+                    button.sort-button(
+                      ~ type='button'
+                      ~ disabled={!header.column.getCanSort()}
+                      ~ onClick={header.column.getToggleSortingHandler()}
+                      ~ )
+                      span #{header.isPlaceholder ? '' : flexRender(header.column.columnDef.header, header.getContext())}
+                      span.sort-mark(aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
+        tbody
+          each row in visibleRows key row.id
+            tr(className={row.getIsSelected() ? 'row-selected' : ''})
+              each cell in row.getVisibleCells() key cell.id
+                td(className={cell.column.id === 'select' ? 'select-cell' : cell.column.id === 'revenue' || cell.column.id === 'health' ? 'numeric-cell' : ''})
+                  if cell.column.id === 'select'
+                    input(
+                      ~ type='checkbox'
+                      ~ aria-label={`Select ${row.original.account}`}
+                      ~ checked={row.getIsSelected()}
+                      ~ onChange={row.getToggleSelectedHandler()}
+                      ~ )
+                  elseif cell.column.id === 'account'
+                    div.account-cell
+                      span.account-mark(aria-hidden='true') #{row.original.account.slice(0, 2).toUpperCase()}
+                      div
+                        b #{row.original.account}
+                        small #{row.original.id}
+                  elseif cell.column.id === 'contact'
+                    div.primary-secondary
+                      b #{row.original.contact}
+                      small #{row.original.email}
+                  elseif cell.column.id === 'status'
+                    span(className={statusClass(row.original.status)}) #{row.original.status}
+                  elseif cell.column.id === 'revenue'
+                    b.numeric #{formatCurrency(row.original.revenue)}
+                  elseif cell.column.id === 'health'
+                    div.health-cell
+                      span #{row.original.health}
+                      span.health-track(aria-hidden='true')
+                        span.health-fill(style={{ width: `${row.original.health}%` }})
+                  elseif cell.column.id === 'updatedAt'
+                    span.muted #{formatRelativeTime(row.original.updatedAt)}
+                  else
+                    | #{String(cell.getValue() ?? '—')}
+          empty
+            tr
+              td.empty-state(colSpan={table.getVisibleLeafColumns().length})
+                b No matching accounts
+                span Try a shorter query or clear the search.
+
+    footer.table-footer
+      div.page-size
+        label(for='explorer-page-size') Rows
+        select#explorer-page-size(
+          ~ value={String(table.state.pagination.pageSize)}
+          ~ onChange={(event) => table.setPageSize(Number((event.currentTarget as HTMLSelectElement).value))}
+          ~ )
+          option(value='10') 10
+          option(value='15') 15
+          option(value='25') 25
+          option(value='50') 50
+      p Page #{table.state.pagination.pageIndex + 1} of #{Math.max(1, table.getPageCount()).toLocaleString()}
+      div.pagination
+        button(type='button' aria-label='First page' disabled={!table.getCanPreviousPage()} onClick={() => table.firstPage()}) «
+        button(type='button' aria-label='Previous page' disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}) ‹
+        button(type='button' aria-label='Next page' disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}) ›
+        button(type='button' aria-label='Last page' disabled={!table.getCanNextPage()} onClick={() => table.lastPage()}) »

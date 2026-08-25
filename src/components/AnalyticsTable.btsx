@@ -1,0 +1,175 @@
+import { createColumnHelper, flexRender, useTable } from '@octanejs/tanstack-table'
+import { formatCompact, formatCurrency, performanceRows, ROW_COUNT } from '../data'
+import type { PerformanceRow } from '../data'
+import { analyticsFeatures } from '../table-config'
+
+module
+  const columnHelper = createColumnHelper<typeof analyticsFeatures, PerformanceRow>()
+  const columns = columnHelper.columns([
+    columnHelper.accessor('region', { header: 'Region', sortFn: 'text' }),
+    columnHelper.accessor('industry', { header: 'Industry', sortFn: 'text' }),
+    columnHelper.accessor('account', {
+      header: 'Account',
+      sortFn: 'text',
+      enableGrouping: false,
+    }),
+    columnHelper.accessor('plan', { header: 'Plan', sortFn: 'text' }),
+    columnHelper.accessor('revenue', {
+      header: 'Total ARR',
+      sortFn: 'basic',
+      aggregationFn: 'sum',
+    }),
+    columnHelper.accessor('seats', {
+      header: 'Seats',
+      sortFn: 'basic',
+      aggregationFn: 'sum',
+    }),
+    columnHelper.accessor('health', {
+      header: 'Avg. health',
+      sortFn: 'basic',
+      aggregationFn: 'mean',
+    }),
+  ])
+
+setup
+  const table = useTable(
+    {
+      key: 'grouped-analytics',
+      features: analyticsFeatures,
+      data: performanceRows,
+      columns,
+      getRowId: (row) => row.id,
+      groupedColumnMode: 'reorder',
+      paginateExpandedRows: true,
+      initialState: {
+        grouping: ['region', 'industry'],
+        expanded: false,
+        sorting: [{ id: 'revenue', desc: true }],
+        pagination: { pageIndex: 0, pageSize: 18 },
+      },
+    },
+    (state) => ({
+      expanded: state.expanded,
+      grouping: state.grouping,
+      pagination: state.pagination,
+      sorting: state.sorting,
+    }),
+  )
+  const modelStartedAt = performance.now()
+  const visibleRows = table.getRowModel().rows
+  const modelDurationMs = performance.now() - modelStartedAt
+  const totalRevenue = table.getColumn('revenue').getAggregationValue<number>()
+  const totalSeats = table.getColumn('seats').getAggregationValue<number>()
+  const regionColumn = table.getColumn('region')
+  const industryColumn = table.getColumn('industry')
+  const isExpanded = table.getIsSomeRowsExpanded() || table.getIsAllRowsExpanded()
+
+section.table-example(aria-labelledby='analytics-heading')
+  header.example-heading
+    div
+      p.eyebrow Group + aggregate + expand
+      h2(className='text-xl!') Portfolio analytics
+      p.example-description Roll 50,000 records into nested regional totals, then expand all the way to the source rows.
+    div.metric-row(aria-label='Portfolio totals')
+      span.metric
+        b #{formatCurrency(totalRevenue)}
+        | total ARR
+      span.metric
+        b #{formatCompact(totalSeats)}
+        | seats
+      span.metric.metric-accent
+        b #{modelDurationMs.toFixed(2)}ms
+        | grouped
+
+  div.table-toolbar.analytics-toolbar
+    div.grouping-controls(aria-label='Grouping columns')
+      span Group by
+      button(
+        ~ type='button'
+        ~ aria-pressed={regionColumn.getIsGrouped()}
+        ~ className={regionColumn.getIsGrouped() ? 'group-chip active' : 'group-chip'}
+        ~ onClick={regionColumn.getToggleGroupingHandler()}
+        ~ ) Region
+      button(
+        ~ type='button'
+        ~ aria-pressed={industryColumn.getIsGrouped()}
+        ~ className={industryColumn.getIsGrouped() ? 'group-chip active' : 'group-chip'}
+        ~ onClick={industryColumn.getToggleGroupingHandler()}
+        ~ ) Industry
+    div.toolbar-actions
+      span #{ROW_COUNT.toLocaleString()} source rows
+      button.secondary-button(
+        ~ type='button'
+        ~ onClick={() => table.toggleAllRowsExpanded(!isExpanded)}
+        ~ ) #{isExpanded ? 'Collapse groups' : 'Expand groups'}
+
+  div.table-frame
+    div.table-scroll
+      table.data-table.analytics-table
+        thead
+          each headerGroup in table.getHeaderGroups() key headerGroup.id
+            tr
+              each header in headerGroup.headers key header.id
+                th(scope='col')
+                  button.sort-button(
+                    ~ type='button'
+                    ~ disabled={!header.column.getCanSort()}
+                    ~ onClick={header.column.getToggleSortingHandler()}
+                    ~ )
+                    span #{header.isPlaceholder ? '' : flexRender(header.column.columnDef.header, header.getContext())}
+                    if header.column.getIsGrouped()
+                      span.group-mark(aria-label='Grouped') G#{header.column.getGroupedIndex() + 1}
+                    else
+                      span.sort-mark(aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
+        tbody
+          each row in visibleRows key row.id
+            tr(className={row.getIsGrouped() ? 'group-row' : 'leaf-row'})
+              each cell in row.getAllCells() key cell.id
+                td(className={cell.column.id === 'revenue' || cell.column.id === 'seats' || cell.column.id === 'health' ? 'numeric-cell' : ''})
+                  if cell.getIsGrouped()
+                    button.group-toggle(
+                      ~ type='button'
+                      ~ style={{ paddingLeft: `${row.depth * 14}px` }}
+                      ~ aria-expanded={row.getIsExpanded()}
+                      ~ onClick={row.getToggleExpandedHandler()}
+                      ~ )
+                      span.disclosure(aria-hidden='true') #{row.getIsExpanded() ? '−' : '+'}
+                      b #{String(cell.getValue())}
+                      small #{row.getLeafRows().length.toLocaleString()} rows
+                  elseif cell.getIsAggregated()
+                    b.numeric
+                      if cell.column.id === 'revenue'
+                        | #{formatCurrency(Number(cell.getValue()))}
+                      elseif cell.column.id === 'seats'
+                        | #{formatCompact(Number(cell.getValue()))}
+                      else
+                        | #{Number(cell.getValue()).toFixed(0)}
+                  elseif cell.getIsPlaceholder() || row.getIsGrouped()
+                    span.group-placeholder —
+                  elseif cell.column.id === 'account'
+                    div.primary-secondary
+                      b #{row.original.account}
+                      small #{row.original.id}
+                  elseif cell.column.id === 'health'
+                    div.health-cell
+                      span #{row.original.health}
+                      span.health-track(aria-hidden='true')
+                        span.health-fill(style={{ width: `${row.original.health}%` }})
+                  elseif cell.column.id === 'revenue'
+                    b.numeric #{formatCurrency(row.original.revenue)}
+                  elseif cell.column.id === 'seats'
+                    span.numeric #{row.original.seats.toLocaleString()}
+                  else
+                    | #{String(cell.getValue() ?? '—')}
+          empty
+            tr
+              td.empty-state(colSpan={table.getAllLeafColumns().length})
+                b Add a grouping dimension
+                span Select Region or Industry above to rebuild the grouped model.
+
+    footer.table-footer
+      p #{table.state.grouping.length} dimensions · #{visibleRows.length} DOM rows
+      p Page #{table.state.pagination.pageIndex + 1} of #{Math.max(1, table.getPageCount()).toLocaleString()}
+      div.pagination
+        button(type='button' aria-label='Previous page' disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}) ‹
+        button(type='button' aria-label='Next page' disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}) ›

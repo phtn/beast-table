@@ -1,0 +1,63 @@
+import {
+  aggregationFn_mean,
+  aggregationFn_sum,
+  columnFilteringFeature,
+  columnGroupingFeature,
+  columnResizingFeature,
+  columnSizingFeature,
+  columnVisibilityFeature,
+  createExpandedRowModel,
+  createFilteredRowModel,
+  createGroupedRowModel,
+  createPaginatedRowModel,
+  createSortedRowModel,
+  filterFn_includesString,
+  globalFilteringFeature,
+  rowAggregationFeature,
+  rowExpandingFeature,
+  rowPaginationFeature,
+  rowSelectionFeature,
+  rowSortingFeature,
+  sortFn_basic,
+  sortFn_text,
+  tableFeatures,
+} from '@octanejs/tanstack-table'
+
+export const explorerFeatures = tableFeatures({
+  columnFilteringFeature,
+  globalFilteringFeature,
+  filteredRowModel: createFilteredRowModel(),
+  filterFns: { includesString: filterFn_includesString },
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: { basic: sortFn_basic, text: sortFn_text },
+  rowPaginationFeature,
+  paginatedRowModel: createPaginatedRowModel(),
+  rowSelectionFeature,
+  columnVisibilityFeature,
+})
+
+export const analyticsFeatures = tableFeatures({
+  rowAggregationFeature,
+  aggregationFns: { mean: aggregationFn_mean, sum: aggregationFn_sum },
+  columnGroupingFeature,
+  groupedRowModel: createGroupedRowModel(),
+  rowExpandingFeature,
+  expandedRowModel: createExpandedRowModel(),
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: { basic: sortFn_basic, text: sortFn_text },
+  rowPaginationFeature,
+  paginatedRowModel: createPaginatedRowModel(),
+})
+
+export const streamFeatures = tableFeatures({
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: { basic: sortFn_basic, text: sortFn_text },
+  rowPaginationFeature,
+  paginatedRowModel: createPaginatedRowModel(),
+  columnVisibilityFeature,
+  columnSizingFeature,
+  columnResizingFeature,
+})
