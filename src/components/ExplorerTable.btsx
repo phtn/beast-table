@@ -2,10 +2,10 @@ import { createColumnHelper, flexRender, functionalUpdate, useTable } from '@oct
 import type { PaginationState, SortingState } from '@octanejs/tanstack-table'
 import { parseAsBoolean, parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from '@octanejs/nuqs'
 import { useEffect, useMemo, useState, useRef, useLayoutEffect } from 'octane'
-import { Badge, Button, Checkbox, HealthMeter, Input, Metric, Header } from './ui'
+import { Badge, Button, Checkbox, HealthMeter, Input, Metric, Select, Header } from './ui'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
-import { formatCurrency, formatRelativeTime, prepareExplorerRows } from '../data'
-import type { ExplorerProgress, PerformanceRow } from '../data'
+import { formatCurrency, formatRelativeTime, prepareExplorerRows, SEED_ROW_COUNTS } from '../data'
+import type { ExplorerProgress, PerformanceRow, SeedRowCount } from '../data'
 import { explorerFeatures } from '../table-config'
 import {gsap} from 'gsap'
 import { useGSAP } from '@octanejs/gsap'
@@ -14,7 +14,9 @@ import { TABLE_QUERY_LIMITS } from './ui/table/hyper/Parsers'
 
 module
   interface Props {
+    onSeedCountChange: (rowCount: SeedRowCount) => void
     rows: ReadonlyArray<PerformanceRow>
+    seedCount: SeedRowCount
     seedDurationMs: number
   }
 
@@ -64,7 +66,7 @@ module
   }
 
   const columnHelper = createColumnHelper<typeof explorerFeatures, PerformanceRow>()
-  const explorerSortIds = ['account', 'contact', 'email', 'region', 'status', 'revenue', 'health', 'updatedAt'] as const
+  const explorerSortIds = ['account', 'owner', 'email', 'region', 'status', 'revenue', 'health', 'updatedAt'] as const
   const explorerQueryParsers = {
     q: parseAsString.withDefault(''),
     page: parseAsInteger.withDefault(1),
@@ -103,7 +105,10 @@ module
     total,
   })
 
-props { rows, seedDurationMs }: Props
+  const formatSeedRowCount = (rowCount: SeedRowCount) =>
+    rowCount === 1_000_000 ? '1M' : `${rowCount / 1_000}k`
+
+props { onSeedCountChange, rows, seedCount, seedDurationMs }: Props
 setup
   const [{ q: globalFilter, page, size, sort, desc }, setExplorerQuery] = useQueryStates(
     explorerQueryParsers,
@@ -386,6 +391,14 @@ setup
     ? 0
     : Math.min(100, (queryState.completed / queryState.total) * 100)
   const queryLabel = queryState.phase === 'sorting' ? 'Ranking' : 'Searching'
+  const handleSeedCountChange = (event: Event) => {
+    const requestedCount = Number((event.currentTarget as HTMLSelectElement).value)
+    const nextSeedCount = SEED_ROW_COUNTS.find((rowCount) => rowCount === requestedCount)
+    if (nextSeedCount === undefined || nextSeedCount === seedCount) return
+
+    void setExplorerQuery({ page: 1 })
+    onSeedCountChange(nextSeedCount)
+  }
 
 section(className='relative rounded-[0.92em] border border-input/70 bg-background shadow-[0_1px_2px_rgba(28,34,26,0.04)] max-[680px]:rounded-[14px]' aria-labelledby='explorer-heading')
   div(className='absolute -top-2 -left-2 rounded-l-full border-r border-input/70 bg-muted w-4 h-4 rotate-45')
@@ -394,9 +407,15 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
   div(className='absolute -bottom-2 -left-2 rounded-l-full border-r border-input/70 bg-muted w-4 h-4 -rotate-45')
 
   Header(eyebrow='Search + sort + select' title='Account Explorer' description='Scan, rank, and select across the full seeded dataset. Only the active page reaches the table model and DOM.')
-    div(className='flex max-w-[530px] border border-input/50 rounded-sm p-1' aria-label='Performance metrics')
-      span(className='font-mono text-muted-foreground text-2xs') #{rows.length.toLocaleString()} rows
-      // Metric(value={rows.length.toLocaleString()} label='rows')
+    label(className='flex max-w-[530px] items-center gap-2 rounded-sm p-1 pl-2 text-2xs font-semibold text-muted-foreground')
+      span Rows
+      Select(
+        ~ value={String(seedCount)}
+        ~ className='min-w-[72px] bg-background font-mono text-2xs font-medium text-foreground'
+        ~ onChange={handleSeedCountChange}
+        ~ )
+        each rowCount in SEED_ROW_COUNTS key rowCount
+          option(value={String(rowCount)}) #{formatSeedRowCount(rowCount)}
 
   div(className='flex min-h-12 items-center justify-between gap-4 px-4 pb-3 max-[680px]:flex-col max-[680px]:items-start')
     label(className='relative flex w-[min(100%,410px)] items-center max-[680px]:w-full')
@@ -425,7 +444,7 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
       span #{selectedCount} selected
 
   div(className='border-t border-input/50')
-    div(className='max-h-[min(590px,63vh)] w-full overflow-auto scrollbar-track-sidebar scrollbar-thumb-octane scrollbar-thin scroll-smooth')
+    div(className='max-h-[min(590px,63vh)] w-full overflow-auto scrollbar-track-sidebar scrollbar-thumb-taupe-600 scrollbar-thin scroll-smooth')
       Table(className='min-w-[1180px]')
         TableHeader
           each headerGroup in table.getHeaderGroups() key headerGroup.id
@@ -465,7 +484,7 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
                       ~ )
                   elseif cell.column.id === 'account'
                     div(className='flex min-w-0 items-center gap-2.5')
-                      span(className='grid size-[32px] shrink-0 place-items-center rounded-sm border border-input/50 bg-sidebar text-xs font-semibold tracking-normal text-muted-foreground' aria-hidden='true') #{row.original.account.slice(0, 2).toUpperCase()}
+                      span(className='grid size-[28px] shrink-0 place-items-center rounded-sm border border-input/50 bg-sidebar text-xs font-semibold tracking-normal text-muted-foreground' aria-hidden='true') #{row.original.account.slice(0, 2).toUpperCase()}
                       div(className='[&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_b]:text-[#242824] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
                         b #{row.original.account}
                         small #{row.original.id}
@@ -473,7 +492,10 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
                     div(className='grid min-w-0 items-center gap-[3px] [&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_b]:text-[#242824] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
                       b #{row.original.contact}
                   elseif cell.column.id === 'email'
-                    small #{row.original.email}
+                    div(className='grid min-w-0 items-center gap-[3px] [&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_b]:text-[#242824] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
+                      b #{row.original.email}
+                  elseif cell.column.id === 'email'
+                    small #{row.original.region}
                   elseif cell.column.id === 'region'
                     small #{row.original.region}
                   elseif cell.column.id === 'status'

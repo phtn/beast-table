@@ -1,5 +1,8 @@
 import type { ColumnPinningPosition, ColumnPinningState, ColumnVisibilityState } from '@octanejs/tanstack-table'
+import type { JSX } from 'octane/jsx-runtime'
 import { isColumnVisible } from './Visibility'
+
+type CellStyle = JSX.IntrinsicElements['td']['style']
 
 export type DefaultColumnPinningPosition = Exclude<ColumnPinningPosition, false>
 
@@ -125,9 +128,7 @@ export const getPinnedColumnLayouts = (
   return layouts
 }
 
-export const getPinnedColumnStyle = (
-  layout: PinnedColumnLayout | undefined
-): Partial<CSSStyleDeclaration> | undefined => {
+export const getPinnedColumnStyle = (layout: PinnedColumnLayout | undefined): CellStyle | undefined => {
   if (!layout) return undefined
 
   return layout.position === 'start' ? { insetInlineStart: layout.offset } : { insetInlineEnd: layout.offset }

@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from '@octanejs/motion'
 import {AnalyticsTable, ExplorerTable, StreamTable} from '@/components'
 import {Button} from '@/components/ui'
 import { formatCompact, prepareAnalyticsRows, ROW_COUNT, seedPerformanceRows } from './data'
-import type { AnalyticsRow, PerformanceRow } from './data'
+import type { AnalyticsRow, PerformanceRow, SeedRowCount } from './data'
 import { navigate, panelRoutes, usePanelRoute } from './router'
 import type { PanelRoute } from './router'
 
@@ -32,13 +32,13 @@ module
   const placeholderRows = [0, 1, 2, 3, 4, 5]
   const MotionDiv = motion.div
 
-  const createInitialSeedState = (): SeedState => ({
+  const createInitialSeedState = (total: SeedRowCount = ROW_COUNT): SeedState => ({
     completed: 0,
     elapsedMs: 0,
     error: null,
     phase: 'preparing',
     rows: null,
-    total: ROW_COUNT,
+    total,
   })
 
   const createInitialAnalyticsState = (total = ROW_COUNT): AnalyticsState => ({
@@ -54,6 +54,7 @@ props _: Record<string, never>
 setup
   const activeId = usePanelRoute()
   const [seedAttempt, setSeedAttempt] = useState(0)
+  const [seedCount, setSeedCount] = useState<SeedRowCount>(ROW_COUNT)
   const [seedState, setSeedState] = useState<SeedState>(createInitialSeedState)
   const [analyticsAttempt, setAnalyticsAttempt] = useState(0)
   const [analyticsState, setAnalyticsState] = useState<AnalyticsState>(createInitialAnalyticsState)
@@ -65,9 +66,11 @@ setup
     let mountTimer: number | undefined
 
     setTablesMounted(false)
-    setSeedState(createInitialSeedState())
+    setSeedState(createInitialSeedState(seedCount))
+    setAnalyticsState(createInitialAnalyticsState(seedCount))
 
     seedPerformanceRows({
+      rowCount: seedCount,
       signal: controller.signal,
       onProgress: (progress) => {
         setSeedState({
@@ -105,7 +108,7 @@ setup
       controller.abort()
       if (mountTimer !== undefined) globalThis.clearTimeout(mountTimer)
     }
-  }, [seedAttempt])
+  }, [seedAttempt, seedCount])
 
   useEffect(() => {
     if (activeId !== 'analytics' || seedState.rows === null) return
@@ -216,7 +219,7 @@ setup
   }
 
 main(
-  ~ className='grid min-h-screen place-items-center p-[clamp(0px,3.5vw,0px)] max-[680px]:[place-items:start_center] max-[680px]:p-0 [&_select:focus-visible]:outline-[3px] [&_select:focus-visible]:outline-solid [&_select:focus-visible]:outline-[#6da5473d] [&_select:focus-visible]:outline-offset-2'
+  ~ className='grid min-h-screen place-items-center p-[clamp(0px,3.5vw,0px)] max-[680px]:[place-items:start_center] max-[680px]:p-0 [&_select:focus-visible]:outline-[0px] [&_select:focus-visible]:outline-solid [&_select:focus-visible]:outline-[#6da5473d] [&_select:focus-visible]:outline-offset-2'
   ~ )
   section(
     ~ className='w-[min(100%,1480px)] overflow-hidden bg-background shadow-[0_5px_5px_rgba(38,47,36,0.12),0_2px_8px_rgba(38,47,36,0.04)] backdrop-blur-[18px] max-[680px]:rounded-[21px]'
@@ -224,8 +227,8 @@ main(
     ~ )
     header(className='grid grid-cols-[minmax(210px,1fr)_auto] items-center gap-6 px-6 py-5 max-[1050px]:grid-cols-[1fr_auto] max-[680px]:gap-4 max-[680px]:px-[15px] max-[680px]:py-[17px]')
       div(className='flex min-w-0 items-center gap-2.5')
-        span(className='grid size-[42px] shrink-0 place-items-center rounded-full max-[680px]:size-[37px]' aria-hidden='true')
-          img(className='size-[42px] opacity-20' src='/beast.svg' alt='beast-logo')
+        span(className='grid shrink-0 place-items-center rounded-full' aria-hidden='true')
+          img(className='size-[32px] md:size-[42px] opacity-20' src='/beast.svg' alt='beast-logo')
         div
           p(className='m-0 mb-0.5 text-[10px] font-[750] uppercase tracking-[0.11em]') Built with Beast
           h2#showcase-title(className='m-0 font-mono text-xs text-[#ff415a]') @octanejs/tanstack-table
@@ -246,7 +249,7 @@ main(
     section#table-panel(
       ~ aria-live='polite'
       ~ aria-labelledby={`route-${activeId}`}
-      ~ className='relative mx-2.5 rounded-t-[1.41em] rounded-b-[0.5em] border border-input bg-muted p-2 max-[680px]:mx-[5px] max-[680px]:rounded-[18px] max-[680px]:p-[5px]'
+      ~ className='relative mx-0 sm:mx-2.5 rounded-t-[1.41em] rounded-b-[0.5em] border border-input bg-muted p-4 sm:p-2 max-[680px]:mx-[5px] max-[680px]:rounded-[18px] max-[680px]:p-[5px]'
       ~ )
       div(className='absolute -top-3.25 rounded-[-4px] -left-3.25 border-r border-input bg-background size-6.5 rotate-45')
       div(className='absolute -top-3.25 rounded-[-4px] -right-3.25 border-l border-input bg-background size-6.5 -rotate-45')
@@ -329,7 +332,12 @@ main(
                 span
                 span
       elseif activeId === 'explorer'
-        ExplorerTable(rows={seedState.rows} seedDurationMs={seedState.elapsedMs})
+        ExplorerTable(
+          ~ rows={seedState.rows}
+          ~ seedCount={seedCount}
+          ~ seedDurationMs={seedState.elapsedMs}
+          ~ onSeedCountChange={setSeedCount}
+          ~ )
       elseif activeId === 'analytics'
         AnalyticsTable(
           ~ rows={analyticsState.rows}
@@ -339,8 +347,7 @@ main(
       else
         StreamTable(rows={seedState.rows})
 
-    footer(className='flex min-h-[50px] items-center justify-between gap-[18px] px-[22px] py-2.5 text-[9px] font-semibold text-[#969c93] max-[680px]:flex-col max-[680px]:items-start max-[680px]:gap-[5px] max-[680px]:px-[17px] max-[680px]:py-3.5 [&_p]:m-0 [&_p]:flex [&_p]:items-center [&_p]:gap-2')
+    footer(className='flex min-h-[50px] items-center justify-between gap-[18px] px-[22px] py-2.5 text-[9px] font-semibold text-muted-foreground max-[680px]:flex-col max-[680px]:items-start max-[680px]:gap-[5px] max-[680px]:px-[17px] max-[680px]:py-3.5 [&_p]:m-0 [&_p]:flex [&_p]:items-center [&_p]:gap-2')
       p
-        span(className='size-[5px] rounded-full bg-[#9fc982]' aria-hidden='true')
-        | Deterministic data by Faker.js
-      p Headless models · atom-level state · bounded DOM
+        a(className='size-[5px] rounded-full bg-[#9fc982]' aria-hidden='true' href='https://beast-docs.vercel.app' target='_blank' rel='noopener noreferrer')
+        | Beast Docs

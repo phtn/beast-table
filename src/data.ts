@@ -1,4 +1,7 @@
-export const ROW_COUNT = 500_000
+export const SEED_ROW_COUNTS = [50_000, 100_000, 250_000, 500_000, 1_000_000] as const
+export type SeedRowCount = (typeof SEED_ROW_COUNTS)[number]
+
+export const ROW_COUNT: SeedRowCount = 50_000
 export const STREAM_ROW_COUNT = 12_000
 const SEED_CHUNK_SIZE = 5_000
 const ANALYTICS_CHUNK_SIZE = 10_000
@@ -75,7 +78,9 @@ interface ProgressOptions<TProgress> {
   signal?: AbortSignal
 }
 
-type SeedRowsOptions = ProgressOptions<SeedProgress>
+interface SeedRowsOptions extends ProgressOptions<SeedProgress> {
+  rowCount?: SeedRowCount
+}
 
 export interface AnalyticsProgress {
   completed: number
@@ -124,7 +129,7 @@ interface AnalyticsAccumulator {
   accounts: number
   healthTotal: number
   industry: Industry
-  region: Region
+  region: string
   revenue: number
   seats: number
 }
@@ -156,7 +161,7 @@ const assertNotAborted = (signal?: AbortSignal) => {
 }
 
 let seedCache: SeedRowsResult | null = null
-let seedTask: Promise<SeedRowsResult> | null = null
+let seedTask: { rowCount: SeedRowCount; task: Promise<SeedRowsResult> } | null = null
 let latestSeedProgress: SeedProgress | null = null
 const seedProgressListeners = new Set<(progress: SeedProgress) => void>()
 
@@ -165,19 +170,19 @@ const publishSeedProgress = (progress: SeedProgress) => {
   for (const listener of seedProgressListeners) listener(progress)
 }
 
-const runSeed = async (): Promise<SeedRowsResult> => {
+const runSeed = async (rowCount: SeedRowCount): Promise<SeedRowsResult> => {
   const startedAt = performance.now()
-  publishSeedProgress({ completed: 0, elapsedMs: 0, phase: 'loading', total: ROW_COUNT })
+  publishSeedProgress({ completed: 0, elapsedMs: 0, phase: 'loading', total: rowCount })
 
   const { faker } = await import('@faker-js/faker/locale/en_US')
 
   faker.seed(24_082_026)
   faker.setDefaultRefDate('2026-08-25T12:00:00.000Z')
 
-  const rows = new Array<PerformanceRow>(ROW_COUNT)
+  const rows = new Array<PerformanceRow>(rowCount)
 
-  for (let chunkStart = 0; chunkStart < ROW_COUNT; chunkStart += SEED_CHUNK_SIZE) {
-    const chunkEnd = Math.min(chunkStart + SEED_CHUNK_SIZE, ROW_COUNT)
+  for (let chunkStart = 0; chunkStart < rowCount; chunkStart += SEED_CHUNK_SIZE) {
+    const chunkEnd = Math.min(chunkStart + SEED_CHUNK_SIZE, rowCount)
 
     for (let index = chunkStart; index < chunkEnd; index += 1) {
       const firstName = faker.person.firstName()
@@ -205,20 +210,36 @@ const runSeed = async (): Promise<SeedRowsResult> => {
       completed: chunkEnd,
       elapsedMs: performance.now() - startedAt,
       phase: 'seeding',
-      total: ROW_COUNT
+      total: rowCount
     })
 
-    if (chunkEnd < ROW_COUNT) await yieldToMain()
+    if (chunkEnd < rowCount) await yieldToMain()
   }
 
   return { elapsedMs: performance.now() - startedAt, rows }
 }
 
-export const seedPerformanceRows = async ({ onProgress, signal }: SeedRowsOptions = {}): Promise<SeedRowsResult> => {
+export const seedPerformanceRows = async ({
+  onProgress,
+  rowCount = ROW_COUNT,
+  signal
+}: SeedRowsOptions = {}): Promise<SeedRowsResult> => {
   assertNotAborted(signal)
 
-  if (seedCache !== null) {
-    return seedCache
+  if (seedCache !== null && seedCache.rows.length >= rowCount) {
+    return seedCache.rows.length === rowCount
+      ? seedCache
+      : { elapsedMs: 0, rows: seedCache.rows.slice(0, rowCount) }
+  }
+
+  if (seedTask !== null && seedTask.rowCount !== rowCount) {
+    try {
+      await seedTask.task
+    } catch {
+      // A failed task for another count should not prevent this request.
+    }
+    assertNotAborted(signal)
+    return seedPerformanceRows({ onProgress, rowCount, signal })
   }
 
   const listener =
@@ -239,20 +260,26 @@ export const seedPerformanceRows = async ({ onProgress, signal }: SeedRowsOption
   signal?.addEventListener('abort', removeListener, { once: true })
 
   if (seedTask === null) {
-    seedTask = runSeed()
+    const task = runSeed(rowCount)
       .then((result) => {
-        seedCache = result
+        if (seedCache === null || result.rows.length > seedCache.rows.length) seedCache = result
         return result
       })
       .catch((error: unknown) => {
-        seedTask = null
-        latestSeedProgress = null
         throw error
       })
+      .finally(() => {
+        if (seedTask?.task === task) {
+          seedTask = null
+          latestSeedProgress = null
+        }
+      })
+
+    seedTask = { rowCount, task }
   }
 
   try {
-    const result = await seedTask
+    const result = await seedTask.task
     assertNotAborted(signal)
     return result
   } finally {
@@ -315,7 +342,7 @@ const runAnalyticsIndex = async (source: ReadonlyArray<PerformanceRow>): Promise
     healthTotal: bucket.healthTotal,
     id: `${bucket.region}:${bucket.industry}`,
     industry: bucket.industry,
-    region: bucket.region,
+    region: bucket.region as Region,
     revenue: bucket.revenue,
     seats: bucket.seats
   }))
