@@ -22,5 +22,5 @@ span(
   ~   className,
   ~ ]}
   ~ )
-  b(className='font-medium text-base tracking-tight lowercase') #{value}
+  b(className='font-medium text-sm tracking-tight lowercase') #{value}
   | #{label}

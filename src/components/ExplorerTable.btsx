@@ -23,7 +23,7 @@ module
   }
 
   const columnHelper = createColumnHelper<typeof explorerFeatures, PerformanceRow>()
-  const explorerSortIds = ['account', 'contact', 'email', 'region', 'plan', 'status', 'revenue', 'health', 'updatedAt'] as const
+  const explorerSortIds = ['account', 'contact', 'email', 'status', 'revenue', 'health', 'updatedAt'] as const
   const explorerQueryParsers = {
     q: parseAsString.withDefault(''),
     page: parseAsInteger.withDefault(1),
@@ -42,8 +42,6 @@ module
     columnHelper.accessor('account', { header: 'Account', sortFn: 'text' }),
     columnHelper.accessor('contact', { header: 'Owner', sortFn: 'text' }),
     columnHelper.accessor('email', { header: 'Email', sortFn: 'text' }),
-    columnHelper.accessor('region', { header: 'Region', sortFn: 'text' }),
-    columnHelper.accessor('plan', { header: 'Plan', sortFn: 'text' }),
     columnHelper.accessor('status', { header: 'Status', sortFn: 'text' }),
     columnHelper.accessor('revenue', { header: 'ARR', sortFn: 'basic' }),
     columnHelper.accessor('health', { header: 'Health', sortFn: 'basic' }),
@@ -199,10 +197,9 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
   div(className='absolute -bottom-2 -left-2 rounded-l-full border-r border-input/70 bg-muted w-4 h-4 -rotate-45')
 
   Header(eyebrow='Search + sort + select' title='Account Explorer' description='Scan, rank, and select across the full seeded dataset. Only the active page reaches the table model and DOM.')
-    div(className='flex max-w-[530px] border border-input/80 rounded-md divide-x divide-input/80 overflow-hidden shrink-0 flex-wrap justify-end max-[1050px]:justify-start max-[680px]:grid max-[680px]:w-full max-[680px]:grid-cols-3' aria-label='Performance metrics')
-      Metric(value={rows.length.toLocaleString()} label='rows')
-      Metric(value={`${(seedDurationMs/1000).toFixed(0)}s`} label='seeded')
-      Metric(value={`${modelDurationMs.toFixed(2)}ms`} label='model' accent)
+    div(className='flex max-w-[530px] border border-input/50 rounded-sm p-1' aria-label='Performance metrics')
+      span(className='font-mono text-muted-foreground text-2xs') #{rows.length.toLocaleString()} rows
+      // Metric(value={rows.length.toLocaleString()} label='rows')
 
   div(className='flex min-h-12 items-center justify-between gap-4 px-4 pb-3 max-[680px]:flex-col max-[680px]:items-start')
     label(className='relative flex w-[min(100%,410px)] items-center max-[680px]:w-full')
@@ -214,24 +211,25 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
         ~ placeholder='Search account, owner, region…'
         ~ onInput={(event) => table.setGlobalFilter((event.currentTarget as HTMLInputElement).value)}
         ~ )
-      // if query.length > 0
-      //   Button(className='absolute right-2 grid size-[25px] place-items-center rounded-[7px] bg-[#eff1ed] p-0 leading-none text-[#777e74]' variant='ghost' size='none' type='button' aria-label='Clear search' onClick={() => table.setGlobalFilter('')}) ×
     div(className='flex items-center gap-2.5 text-xs text-muted-foreground max-[680px]:flex-wrap')
       if isQuerying
         span(className='inline-flex items-center gap-[9px]')
-          span(className='font-mono tabular-nums text-[#ff415a]' role='status') #{queryLabel} #{queryPercent.toFixed(0)}%
+          span(className='font-mono tabular-nums text-orange-500 min-w-28' role='status')
+            span #{queryLabel} &nbsp;
+            span(className='px-1.5' aria-hidden='true') #{queryPercent.toFixed(0)}%
           span(className='text-[#bbc0b8]' aria-hidden='true') ·
       elseif queryState.phase === 'error'
         span(className='inline-flex items-center gap-[9px]')
           span(className='font-mono tabular-nums text-[#ca594b]' role='status') Index interrupted
           span(className='text-[#bbc0b8]' aria-hidden='true') ·
-      span #{filteredCount.toLocaleString()} results
+      if (query)
+        span #{filteredCount.toLocaleString()} results
       span(className='text-[#bbc0b8]' aria-hidden='true') ·
       span #{selectedCount} selected
 
-  div(className='border-t border-[#e8ebe6]')
-    div(className='max-h-[min(590px,63vh)] w-full overflow-auto scrollbar-track-sidebar scrollbar-thumb-octane scrollbar-thin')
-      table(className='w-full min-w-[1180px] table-auto border-separate border-spacing-0 whitespace-nowrap [&_th]:sticky [&_th]:top-0 [&_th]:z-[2] [&_th]:h-[42px] [&_th]:border-b [&_th]:border-[#e4e7e2] [&_th]:bg-sidebar [&_th]:px-4 [&_th]:py-0 [&_th]:text-left [&_th]:text-[9px] [&_th]:font-extrabold [&_th]:uppercase [&_th]:tracking-[0.1em] [&_th]:text-[#7f867c] [&_th]:backdrop-blur-sm [&_td]:h-[55px] [&_td]:overflow-hidden [&_td]:border-b [&_td]:border-[#edf0eb] [&_td]:px-4 [&_td]:py-2 [&_td]:text-[11px] [&_td]:text-ellipsis [&_td]:text-[#50564e] [&_tbody_tr]:bg-background [&_tbody_tr]:transition-colors [&_tbody_tr]:duration-100 [&_tbody_tr:hover]:bg-sidebar [&_tbody_tr:last-child_td]:border-b-0')
+  div(className='border-t border-input/50')
+    div(className='max-h-[min(590px,63vh)] w-full overflow-auto scrollbar-track-sidebar scrollbar-thumb-octane scrollbar-thin scroll-smooth')
+      table(className='w-full min-w-[1180px] table-auto border-separate border-spacing-0 whitespace-nowrap [&_th]:sticky [&_th]:top-0 [&_th]:z-[2] [&_th]:h-[40px] [&_th]:border-b [&_th]:border-input/40 [&_th]:bg-sidebar [&_th]:px-4 [&_th]:py-0 [&_th]:text-left [&_th]:text-2xs [&_th]:font-extrabold [&_th]:uppercase [&_th]:tracking-[0.1em] [&_th]:text-muted-foreground [&_th]:backdrop-blur-sm [&_td]:h-[54px] [&_td]:overflow-hidden [&_td]:border-b [&_td]:border-sidebar [&_td]:px-4 [&_td]:py-2 [&_td]:text-xs [&_td]:text-ellipsis [&_td]:text-muted-foreground [&_tbody_tr]:bg-background [&_tbody_tr]:transition-colors [&_tbody_tr]:duration-100 [&_tbody_tr:hover]:bg-sidebar/60 [&_tbody_tr:last-child_td]:border-b-0')
         thead
           each headerGroup in table.getHeaderGroups() key headerGroup.id
             tr
@@ -256,10 +254,10 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
                       ~ onClick={header.column.getToggleSortingHandler()}
                       ~ )
                       span #{header.isPlaceholder ? '' : flexRender(header.column.columnDef.header, header.getContext())}
-                      span(className='text-[10px] text-[#bdc2ba]' aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
+                      span(className='text-2xs text-muted-foreground' aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
         tbody
           each row in visibleRows key row.id
-            tr(className={row.getIsSelected() ? 'bg-sidebar! shadow-[inset_3px_0_#8fba6e]' : ''})
+            tr(className={row.getIsSelected() ? 'bg-sidebar!' : ''})
               each cell in row.getVisibleCells() key cell.id
                 td(className={cell.column.id === 'select' ? 'w-12 pr-2! pl-[18px]! text-center!' : cell.column.id === 'revenue' || cell.column.id === 'health' ? 'text-right' : ''})
                   if cell.column.id === 'select'
@@ -270,7 +268,7 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
                       ~ )
                   elseif cell.column.id === 'account'
                     div(className='flex min-w-0 items-center gap-2.5')
-                      span(className='grid size-[31px] shrink-0 place-items-center rounded-[9px] border border-[rgba(70,91,58,0.1)] bg-[#e9f1e4] text-[9px] font-extrabold tracking-[-0.03em] text-[#597249]' aria-hidden='true') #{row.original.account.slice(0, 2).toUpperCase()}
+                      span(className='grid size-[32px] shrink-0 place-items-center rounded-sm border border-input/50 bg-sidebar text-xs font-semibold tracking-normal text-muted-foreground' aria-hidden='true') #{row.original.account.slice(0, 2).toUpperCase()}
                       div(className='[&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_b]:text-[#242824] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
                         b #{row.original.account}
                         small #{row.original.id}
