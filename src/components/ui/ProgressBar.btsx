@@ -1,0 +1,48 @@
+import type { JSX } from 'octane/jsx-runtime'
+import { motion, useReducedMotion } from '@octanejs/motion'
+
+module
+  type NativeDivProps = JSX.IntrinsicElements['div']
+  type ProgressTone = 'active' | 'success' | 'error'
+
+  type Props = Omit<
+    NativeDivProps,
+    'aria-valuemax' | 'aria-valuemin' | 'aria-valuenow' | 'children' | 'class' | 'className' | 'role'
+  > & {
+    className?: NativeDivProps['className']
+    label: string
+    max?: number
+    tone?: ProgressTone
+    value: number
+  }
+
+  const MotionDiv = motion.div
+
+props { className, label, max = 100, tone = 'active', value, ...divProps }: Props
+setup
+  const reduceMotion = useReducedMotion()
+  const normalizedMax = Math.max(1, max)
+  const normalizedValue = Math.max(0, Math.min(normalizedMax, value))
+  const progress = normalizedValue / normalizedMax
+  const transition = reduceMotion
+    ? { duration: 0 }
+    : { type: 'spring', stiffness: 150, damping: 24, mass: 0.55 }
+
+div(
+  ~ {...divProps}
+  ~ className={[
+  ~   'relative h-[7px] w-full overflow-hidden rounded-full bg-[#e3e7e0]',
+  ~   className,
+  ~ ]}
+  ~ role='progressbar'
+  ~ aria-label={label}
+  ~ aria-valuemin={0}
+  ~ aria-valuemax={normalizedMax}
+  ~ aria-valuenow={Number(normalizedValue.toFixed(0))}
+  ~ )
+  MotionDiv(
+    ~ className={`h-full w-full origin-left rounded-full will-change-transform ${tone === 'success' ? 'bg-success' : tone === 'error' ? 'bg-octane' : 'bg-[#ff415a]'}`}
+    ~ initial={{ scaleX: 0 }}
+    ~ animate={{ scaleX: progress }}
+    ~ transition={transition}
+    ~ )

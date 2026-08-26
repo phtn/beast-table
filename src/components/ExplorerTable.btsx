@@ -1,7 +1,7 @@
 import { createColumnHelper, flexRender, functionalUpdate, useTable } from '@octanejs/tanstack-table'
 import type { PaginationState, SortingState } from '@octanejs/tanstack-table'
 import { parseAsBoolean, parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from '@octanejs/nuqs'
-import { useEffect, useMemo, useState, useRef, useLayoutEffect } from 'octane'
+import { useEffect, useMemo, useState, useRef } from 'octane'
 import { Badge, Button, Checkbox, HealthMeter, Input, Metric, Select, Header } from './ui'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { formatCurrency, formatRelativeTime, prepareExplorerRows, SEED_ROW_COUNTS } from '../data'
@@ -279,40 +279,59 @@ setup
 
   const rowMotionRootRef = useRef<HTMLTableSectionElement>(null)
 
-  useLayoutEffect(() => {
+    useGSAP(
+    () => {
       const root = rowMotionRootRef.current
+      if (!root) return
 
-      if (!enableRowReordering || !root) {
-        return
-      }
+      const rowElements = gsap.utils.toArray<HTMLTableRowElement>(
+        '[data-reorder-row-id]',
+        root,
+      )
 
-      const rows = gsap.utils.toArray<HTMLTableRowElement>('[data-reorder-row-id]', root)
+      if (rowElements.length === 0) return
 
-      if (rows.length === 0) {
+      // Preserve smooth handoff between rapid drag-state updates.
+      gsap.killTweensOf(rowElements)
+
+      if (!enableRowReordering) {
+        gsap.set(rowElements, {
+          clearProps: 'transform,opacity',
+        })
         return
       }
 
       const prefersReducedMotion =
-        typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
       if (prefersReducedMotion) {
-        gsap.set(rows, { clearProps: 'transform,opacity' })
+        gsap.set(rowElements, {
+          clearProps: 'transform,opacity',
+        })
         return
       }
 
-      const activeIndex = draggedRowId ? rows.findIndex((row) => row.dataset.reorderRowId === draggedRowId) : -1
-      const targetIndex = dropTarget ? rows.findIndex((row) => row.dataset.reorderRowId === dropTarget.rowId) : -1
+      const activeIndex = draggedRowId
+        ? rowElements.findIndex(
+            (row) => row.dataset.reorderRowId === draggedRowId,
+          )
+        : -1
 
-      gsap.killTweensOf(rows)
+      const targetIndex = dropTarget
+        ? rowElements.findIndex(
+            (row) => row.dataset.reorderRowId === dropTarget.rowId,
+          )
+        : -1
 
-      for (const [rowIndex, row] of rows.entries()) {
+      for (const [rowIndex, row] of rowElements.entries()) {
         const isDraggedRow = rowIndex === activeIndex
         const y =
           draggedRowId && dropTarget
             ? getRowDragOffset({
                 activeIndex,
                 rowIndex,
-                targetIndex
+                targetIndex,
               })
             : 0
 
@@ -323,15 +342,21 @@ setup
           duration: isDraggedRow ? 0.16 : 0.22,
           ease: 'power2.out',
           overwrite: true,
-          clearProps: draggedRowId ? undefined : 'transform,opacity'
+          clearProps: draggedRowId
+            ? undefined
+            : 'transform,opacity',
         })
       }
-
-      return () => {
-        gsap.killTweensOf(rows)
-      }
-    }, [draggedRowId, dropTarget, enableRowReordering])
-
+    },
+    {
+      scope: rowMotionRootRef,
+      dependencies: [
+        draggedRowId,
+        dropTarget,
+        enableRowReordering,
+      ],
+    },
+  )
   const table = useTable(
     {
       key: 'account-explorer',
@@ -400,11 +425,11 @@ setup
     onSeedCountChange(nextSeedCount)
   }
 
-section(className='relative rounded-[0.92em] border border-input/70 bg-background shadow-[0_1px_2px_rgba(28,34,26,0.04)] max-[680px]:rounded-[14px]' aria-labelledby='explorer-heading')
-  div(className='absolute -top-2 -left-2 rounded-l-full border-r border-input/70 bg-muted w-4 h-4 rotate-45')
-  div(className='absolute -top-2 -right-2 rounded-r-full border-l border-input/70 bg-muted w-4 h-4 -rotate-45')
-  div(className='absolute -bottom-2 -right-2 rounded-b-full border-t border-input/70 bg-muted w-4 h-4 -rotate-45')
-  div(className='absolute -bottom-2 -left-2 rounded-l-full border-r border-input/70 bg-muted w-4 h-4 -rotate-45')
+section(className='relative rounded-[0.95em] md:rounded-[0.92em] border border-input/70 bg-background shadow-[0_1px_2px_rgba(28,34,26,0.04)]' aria-labelledby='explorer-heading')
+  div(className='absolute -top-1.25 md:-top-2 -left-0.25 md:-left-2 rounded-l-full border-r border-input/70 bg-muted w-2 md:w-4 h-4 rotate-45')
+  div(className='absolute -top-1.25 md:-top-2 -right-0.25 md:-right-2 rounded-r-full border-l border-input/70 bg-muted w-2 md:w-4 h-4 -rotate-45')
+  div(className='absolute -bottom-0.25 md:-bottom-2 -right-1.25 md:-right-2 rounded-b-full border-t border-input/70 bg-muted w-4 h-2 md:h-4 -rotate-45')
+  div(className='absolute -bottom-1.25 md:-bottom-2 -left-0.25 md:-left-2 rounded-l-full border-r border-input/70 bg-muted w-2 md:w-4 h-4 -rotate-45')
 
   Header(eyebrow='Search + sort + select' title='Account Explorer' description='Scan, rank, and select across the full seeded dataset. Only the active page reaches the table model and DOM.')
     label(className='flex max-w-[530px] items-center gap-2 rounded-sm p-1 pl-2 text-2xs font-semibold text-muted-foreground')
@@ -473,7 +498,7 @@ section(className='relative rounded-[0.92em] border border-input/70 bg-backgroun
                       span(className='text-2xs text-muted-foreground' aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
         TableBody(ref={rowMotionRootRef})
           each row in visibleRows key row.id
-            TableRow(className={row.getIsSelected() ? 'bg-sidebar!' : ''})
+            TableRow(data-reorder-row-id={row.id} className={row.getIsSelected() ? 'bg-sidebar!' : ''})
               each cell in row.getVisibleCells() key cell.id
                 TableCell(className={cell.column.id === 'select' ? 'w-12 pr-2! pl-[18px]! text-center!' : cell.column.id === 'revenue' || cell.column.id === 'health' ? 'text-right' : ''})
                   if cell.column.id === 'select'

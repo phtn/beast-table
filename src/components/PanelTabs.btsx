@@ -1,0 +1,50 @@
+import type { JSX } from 'octane/jsx-runtime'
+import type { PanelId, PanelRoute } from '../router'
+
+module
+  type NativeNavProps = JSX.IntrinsicElements['nav']
+
+  type Props = Omit<NativeNavProps, 'aria-label' | 'children' | 'class' | 'className'> & {
+    activeId: PanelId
+    className?: NativeNavProps['className']
+    items: readonly PanelRoute[]
+    label?: string
+    onNavigate: (href: PanelRoute['href']) => void
+  }
+
+  const baseClassName = 'inline-flex items-center justify-self-end gap-[3px] rounded-full border border-[rgba(25,30,24,0.045)] bg-muted p-1 max-[1050px]:col-span-full max-[1050px]:row-start-2 max-[1050px]:justify-self-center max-[680px]:w-full'
+
+props { activeId, className, items, label = 'Table examples', onNavigate, ...navProps }: Props
+setup
+  const handleNavigate = (
+    event: MouseEvent & { currentTarget: HTMLAnchorElement },
+    href: PanelRoute['href'],
+  ) => {
+    if (
+      event.defaultPrevented
+      || event.button !== 0
+      || event.metaKey
+      || event.ctrlKey
+      || event.shiftKey
+      || event.altKey
+    ) return
+
+    event.preventDefault()
+    onNavigate(href)
+  }
+
+nav(
+  ~ {...navProps}
+  ~ className={[baseClassName, className]}
+  ~ aria-label={label}
+  ~ )
+  each item in items key item.id
+    a(
+      ~ href={item.href}
+      ~ id={`route-${item.id}`}
+      ~ aria-current={activeId === item.id ? 'page' : undefined}
+      ~ className={`text-center min-w-[142px] cursor-pointer rounded-full border-0 px-4 py-2.5 text-xs font-medium tracking-[-0.01em] transition-[color,background,box-shadow] duration-150 hover:text-[#242824] max-[680px]:min-w-0 max-[680px]:flex-1 max-[680px]:px-2 ${activeId === item.id ? 'bg-[rgba(255,255,255,0.98)] text-[#1f231f] shadow-[0_1px_5px_rgba(37,43,35,0.13)]' : 'bg-transparent text-[#666]'}`}
+      ~ onClick={(event) => handleNavigate(event, item.href)}
+      ~ )
+      span(className='max-[680px]:hidden') #{item.label}
+      span(className='hidden max-[680px]:inline') #{item.shortLabel}

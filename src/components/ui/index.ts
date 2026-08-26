@@ -5,6 +5,7 @@ import Header from './Header.btsx'
 import HealthMeter from './HealthMeter.btsx'
 import Input from './Input.btsx'
 import Metric from './Metric.btsx'
+import ProgressBar from './ProgressBar.btsx'
 import Select from './Select.btsx'
 import Switch from './Switch.btsx'
-export { Badge, Button, Checkbox, Header, HealthMeter, Input, Metric, Select, Switch }
+export { Badge, Button, Checkbox, Header, HealthMeter, Input, Metric, ProgressBar, Select, Switch }

@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'octane'
-import { motion, useReducedMotion } from '@octanejs/motion'
-import {AnalyticsTable, ExplorerTable, StreamTable} from '@/components'
-import {Button} from '@/components/ui'
+import {AnalyticsTable, ExplorerTable, PanelTabs, StreamTable} from '@/components'
+import {Button, ProgressBar} from '@/components/ui'
 import { formatCompact, prepareAnalyticsRows, ROW_COUNT, seedPerformanceRows } from './data'
 import type { AnalyticsRow, PerformanceRow, SeedRowCount } from './data'
 import { navigate, panelRoutes, usePanelRoute } from './router'
-import type { PanelRoute } from './router'
 
 module
   type SeedPhase = 'preparing' | 'loading' | 'seeding' | 'ready' | 'error'
@@ -30,7 +28,6 @@ module
   }
 
   const placeholderRows = [0, 1, 2, 3, 4, 5]
-  const MotionDiv = motion.div
 
   const createInitialSeedState = (total: SeedRowCount = ROW_COUNT): SeedState => ({
     completed: 0,
@@ -59,7 +56,6 @@ setup
   const [analyticsAttempt, setAnalyticsAttempt] = useState(0)
   const [analyticsState, setAnalyticsState] = useState<AnalyticsState>(createInitialAnalyticsState)
   const [tablesMounted, setTablesMounted] = useState(false)
-  const reduceMotion = useReducedMotion()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -200,22 +196,12 @@ setup
             : `${seedState.completed.toLocaleString()} of ${seedState.total.toLocaleString()} rows · ${formatCompact(progressRate)}/sec`
   const progressReady = progressState.phase === 'ready'
   const progressError = progressState.phase === 'error'
-  const progressTransition = reduceMotion
-    ? { duration: 0 }
-    : { type: 'spring', stiffness: 150, damping: 24, mass: 0.55 }
   const retryProgress = () => {
     if (showAnalyticsProgress) {
       setAnalyticsAttempt((value) => value + 1)
     } else {
       setSeedAttempt((value) => value + 1)
     }
-  }
-
-  const navigateToPanel = (event: MouseEvent & { currentTarget: HTMLAnchorElement }, panel: PanelRoute) => {
-    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-
-    event.preventDefault()
-    navigate(panel.href)
   }
 
 main(
@@ -231,25 +217,16 @@ main(
           img(className='size-[32px] md:size-[42px] opacity-20' src='/beast.svg' alt='beast-logo')
         div
           p(className='m-0 mb-0.5 text-[10px] font-[750] uppercase tracking-[0.11em]') Built with Beast
-          h2#showcase-title(className='m-0 font-mono text-xs text-[#ff415a]') @octanejs/tanstack-table
-      nav(
-        ~ className='inline-flex items-center justify-self-end gap-[3px] rounded-full border border-[rgba(25,30,24,0.045)] bg-muted p-1 max-[1050px]:col-span-full max-[1050px]:row-start-2 max-[1050px]:justify-self-center max-[680px]:w-full'
-        ~ aria-label='Table examples'
+          h2#showcase-title(className='m-0 font-mono text-xs text-[#ff415a]') @octanejs/tanstack-table @octanejs/nuqs @octanejs/gsap
+      PanelTabs(
+        ~ activeId={activeId}
+        ~ items={panelRoutes}
+        ~ onNavigate={navigate}
         ~ )
-        each panel in panelRoutes key panel.id
-          a(
-            ~ href={panel.href}
-            ~ id={`route-${panel.id}`}
-            ~ aria-current={activeId === panel.id ? 'page' : undefined}
-            ~ className={`text-center min-w-[142px] cursor-pointer rounded-full border-0 px-4 py-2.5 text-xs font-medium tracking-[-0.01em] transition-[color,background,box-shadow] duration-150 hover:text-[#242824] max-[680px]:min-w-0 max-[680px]:flex-1 max-[680px]:px-2 ${activeId === panel.id ? 'bg-[rgba(255,255,255,0.98)] text-[#1f231f] shadow-[0_1px_5px_rgba(37,43,35,0.13)]' : 'bg-transparent text-[#666]'}`}
-            ~ onClick={(event) => navigateToPanel(event, panel)}
-            ~ )
-            span(className='max-[680px]:hidden') #{panel.label}
-            span(className='hidden max-[680px]:inline') #{panel.shortLabel}
     section#table-panel(
       ~ aria-live='polite'
       ~ aria-labelledby={`route-${activeId}`}
-      ~ className='relative mx-0 sm:mx-2.5 rounded-t-[1.41em] rounded-b-[0.5em] border border-input bg-muted p-4 sm:p-2 max-[680px]:mx-[5px] max-[680px]:rounded-[18px] max-[680px]:p-[5px]'
+      ~ className='relative mx-0 sm:mx-2.5 rounded-[1.40em] md:rounded-t-[1.41em] rounded-b-[0.5em] border border-input bg-muted p-4 sm:p-2 max-[680px]:mx-[5px] max-[680px]:p-[5px]'
       ~ )
       div(className='absolute -top-3.25 rounded-[-4px] -left-3.25 border-r border-input bg-background size-6.5 rotate-45')
       div(className='absolute -top-3.25 rounded-[-4px] -right-3.25 border-l border-input bg-background size-6.5 -rotate-45')
@@ -265,21 +242,12 @@ main(
             ~ )
           div(className='grid min-w-0 gap-0.75')
             b(className='text-2xs text-[#292e28]') #{progressTitle} in #{(progressState.elapsedMs / 1_000).toFixed(1)}s
-            // span #{progressDetail}
-        div(
-          ~ className='relative h-[7px] w-full overflow-hidden rounded-full bg-[#e3e7e0] max-[680px]:col-span-full max-[680px]:row-start-2'
-          ~ role='progressbar'
-          ~ aria-label={showAnalyticsProgress ? 'Analytics indexing progress' : 'Dataset seeding progress'}
-          ~ aria-valuemin={0}
-          ~ aria-valuemax={100}
-          ~ aria-valuenow={Number(progressPercent.toFixed(0))}
+        ProgressBar(
+          ~ className='max-[680px]:col-span-full max-[680px]:row-start-2'
+          ~ label={showAnalyticsProgress ? 'Analytics indexing progress' : 'Dataset seeding progress'}
+          ~ value={progressPercent}
+          ~ tone={progressReady ? 'success' : progressError ? 'error' : 'active'}
           ~ )
-          MotionDiv(
-            ~ className={`h-full w-full origin-left rounded-full will-change-transform ${progressReady ? 'bg-success' : progressError ? 'bg-octane' : 'bg-[#ff415a]'}`}
-            ~ initial={{ scaleX: 0 }}
-            ~ animate={{ scaleX: progressPercent / 100 }}
-            ~ transition={progressTransition}
-            ~ )
         div(className='grid min-w-[52px] gap-0.5 text-right max-[680px]:col-start-2 max-[680px]:row-start-1')
           b(className='font-mono text-[11px] tabular-nums text-[#363b35]') #{progressPercent.toFixed(0)}%
 
@@ -347,7 +315,7 @@ main(
       else
         StreamTable(rows={seedState.rows})
 
-    footer(className='flex min-h-[50px] items-center justify-between gap-[18px] px-[22px] py-2.5 text-[9px] font-semibold text-muted-foreground max-[680px]:flex-col max-[680px]:items-start max-[680px]:gap-[5px] max-[680px]:px-[17px] max-[680px]:py-3.5 [&_p]:m-0 [&_p]:flex [&_p]:items-center [&_p]:gap-2')
-      p
-        a(className='size-[5px] rounded-full bg-[#9fc982]' aria-hidden='true' href='https://beast-docs.vercel.app' target='_blank' rel='noopener noreferrer')
+    footer(className='flex min-h-[50px] w-full items-center gap-[18px] px-[22px] py-2.5 text-[9px] font-semibold text-muted-foreground max-[680px]:flex-col max-[680px]:items-start max-[680px]:gap-[5px] max-[680px]:px-[17px] max-[680px]:py-3.5 [&_p]:m-0 [&_p]:flex [&_p]:items-center [&_p]:gap-2')
+      div
+        a(className='text-right' aria-hidden='true' href='https://beast-docs.vercel.app' target='_blank' rel='noopener noreferrer')
         | Beast Docs
