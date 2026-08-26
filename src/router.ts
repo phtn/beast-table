@@ -10,9 +10,9 @@ export interface PanelRoute {
 }
 
 export const panelRoutes: readonly PanelRoute[] = [
-  { id: 'explorer', href: '/explorer', label: 'Account Explorer', shortLabel: 'Explorer' },
-  { id: 'analytics', href: '/analytics', label: 'Grouped Analytics', shortLabel: 'Analytics' },
-  { id: 'stream', href: '/stream', label: 'Live Stream', shortLabel: 'Stream' },
+  { id: 'explorer', href: '/explorer', label: 'Explorer', shortLabel: 'Explorer' },
+  { id: 'analytics', href: '/analytics', label: 'Analytics', shortLabel: 'Analytics' },
+  { id: 'stream', href: '/stream', label: 'Live Stream', shortLabel: 'Stream' }
 ]
 
 const navigationEvent = 'table:navigate'
