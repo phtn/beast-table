@@ -26,7 +26,7 @@ td(
   ~ style={getPinnedColumnStyle(pinnedColumnLayout)}
   ~ className={cn('overflow-hidden p-0 [&:last-child>div]:py-0 border-b border-r border-sidebar-border first:border-l-0',
     ~ {
-      ~ 'sticky z-10 bg-[#f5f6f7] dark:bg-[#1d212980] backdrop-blur-3xl transition-[inset-inline-start,inset-inline-end] duration-200 ease-out motion-reduce:transition-none': pinnedColumnLayout,
+      ~ 'sticky z-10 transition-[inset-inline-start,inset-inline-end] duration-200 ease-out motion-reduce:transition-none': pinnedColumnLayout,
       ~ 'shadow-[4px_0_6px_-4px_hsl(var(--foreground)/0.25)] border-r border-sidebar-border': pinnedColumnLayout?.isBoundary && pinnedColumnLayout.position === 'start',
       ~ 'shadow-[-4px_0_6px_-4px_hsl(var(--foreground)/0.25)]': pinnedColumnLayout?.isBoundary && pinnedColumnLayout.position === 'end',
       ~ 'dark:bg-background/10': isEditing && !pinnedColumnLayout,

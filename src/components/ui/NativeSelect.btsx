@@ -1,0 +1,18 @@
+import type { JSX } from 'octane/jsx-runtime'
+
+module
+  type NativeSelectProps = JSX.IntrinsicElements['select']
+
+  type Props = Omit<NativeSelectProps, 'class' | 'className'> & {
+    className?: NativeSelectProps['className']
+  }
+
+  const baseClassName = 'h-8 cursor-pointer rounded-md border border-input bg-sidebar/50 px-2 text-xs shadow-[0_1px_2px_rgba(31,36,29,0.03)] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[#6da5473d] focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
+
+props { children, className, ...selectProps }: Props
+
+select(
+  ~ {...selectProps}
+  ~ className={[baseClassName, className]}
+  ~ )
+  | #{children}

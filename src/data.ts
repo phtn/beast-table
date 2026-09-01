@@ -107,6 +107,11 @@ export interface ExplorerSort {
   id: string
 }
 
+export interface ExplorerColumnFilter {
+  id: string
+  value: unknown
+}
+
 export interface ExplorerProgress {
   completed: number
   elapsedMs: number
@@ -121,6 +126,7 @@ export interface ExplorerRowsResult {
 }
 
 interface ExplorerRowsOptions extends ProgressOptions<ExplorerProgress> {
+  filters?: ReadonlyArray<ExplorerColumnFilter>
   query?: string
   sorting?: ReadonlyArray<ExplorerSort>
 }
@@ -413,8 +419,18 @@ let explorerTask: ExplorerTask | null = null
 
 const normalizeExplorerQuery = (query: string) => query.trim().toLocaleLowerCase()
 
-const getExplorerKey = (query: string, sorting: ReadonlyArray<ExplorerSort>) =>
-  `${normalizeExplorerQuery(query)}\u0000${sorting.map((sort) => `${sort.id}:${sort.desc ? 'desc' : 'asc'}`).join(',')}`
+const getExplorerKey = (
+  query: string,
+  sorting: ReadonlyArray<ExplorerSort>,
+  filters: ReadonlyArray<ExplorerColumnFilter>
+) => {
+  const filterKey = [...filters]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map((filter) => `${filter.id}:${JSON.stringify(filter.value)}`)
+    .join(',')
+
+  return `${normalizeExplorerQuery(query)}\u0000${sorting.map((sort) => `${sort.id}:${sort.desc ? 'desc' : 'asc'}`).join(',')}\u0000${filterKey}`
+}
 
 const matchesExplorerQuery = (row: PerformanceRow, query: string) => {
   if (query.length === 0) return true
@@ -429,6 +445,51 @@ const matchesExplorerQuery = (row: PerformanceRow, query: string) => {
     String(row.revenue).includes(query) ||
     String(row.health).includes(query)
   )
+}
+
+const getExplorerRange = (value: unknown): readonly [unknown, unknown] =>
+  Array.isArray(value) ? [value[0], value[1]] : [undefined, undefined]
+
+const getExplorerNumberBound = (value: unknown) => {
+  if (value === undefined || value === null || String(value).trim() === '') return undefined
+  const number = Number(value)
+  return Number.isFinite(number) ? number : undefined
+}
+
+const getExplorerDateBound = (value: unknown, endOfDay: boolean) => {
+  if (typeof value !== 'string' || value.length === 0) return undefined
+  const timestamp = new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00'}`).getTime()
+  return Number.isFinite(timestamp) ? timestamp : undefined
+}
+
+export const matchesExplorerColumnFilters = (row: PerformanceRow, filters: ReadonlyArray<ExplorerColumnFilter>) => {
+  for (const filter of filters) {
+    if (filter.id === 'region' || filter.id === 'status') {
+      const selected = Array.isArray(filter.value) ? filter.value.map(String) : []
+      if (selected.length > 0 && !selected.includes(String(row[filter.id]))) return false
+      continue
+    }
+
+    if (filter.id === 'revenue' || filter.id === 'health') {
+      const [rawMinimum, rawMaximum] = getExplorerRange(filter.value)
+      const minimum = getExplorerNumberBound(rawMinimum)
+      const maximum = getExplorerNumberBound(rawMaximum)
+      const value = row[filter.id]
+      if (minimum !== undefined && value < minimum) return false
+      if (maximum !== undefined && value > maximum) return false
+      continue
+    }
+
+    if (filter.id === 'updatedAt') {
+      const [rawFrom, rawTo] = getExplorerRange(filter.value)
+      const from = getExplorerDateBound(rawFrom, false)
+      const to = getExplorerDateBound(rawTo, true)
+      if (from !== undefined && row.updatedAt < from) return false
+      if (to !== undefined && row.updatedAt > to) return false
+    }
+  }
+
+  return true
 }
 
 const getExplorerSortValue = (row: PerformanceRow, id: string): string | number => {
@@ -540,6 +601,7 @@ const runExplorerQuery = async (
   source: ReadonlyArray<PerformanceRow>,
   query: string,
   sorting: ReadonlyArray<ExplorerSort>,
+  filters: ReadonlyArray<ExplorerColumnFilter>,
   signal: AbortSignal,
   publish: (progress: ExplorerProgress) => void
 ): Promise<ExplorerRowsResult> => {
@@ -552,7 +614,9 @@ const runExplorerQuery = async (
 
     for (let index = chunkStart; index < chunkEnd; index += 1) {
       const row = source[index]
-      if (matchesExplorerQuery(row, normalizedQuery)) filteredRows.push(row)
+      if (matchesExplorerQuery(row, normalizedQuery) && matchesExplorerColumnFilters(row, filters)) {
+        filteredRows.push(row)
+      }
     }
 
     publish({
@@ -605,7 +669,8 @@ const createExplorerTask = (
   source: ReadonlyArray<PerformanceRow>,
   key: string,
   query: string,
-  sorting: ReadonlyArray<ExplorerSort>
+  sorting: ReadonlyArray<ExplorerSort>,
+  filters: ReadonlyArray<ExplorerColumnFilter>
 ) => {
   const controller = new AbortController()
   const listeners = new Set<(progress: ExplorerProgress) => void>()
@@ -613,7 +678,7 @@ const createExplorerTask = (
 
   const task = Promise.resolve()
     .then(() =>
-      runExplorerQuery(source, query, sorting, controller.signal, (progress) => {
+      runExplorerQuery(source, query, sorting, filters, controller.signal, (progress) => {
         record.latestProgress = progress
         for (const listener of listeners) listener(progress)
       })
@@ -641,17 +706,17 @@ const createExplorerTask = (
 
 export const prepareExplorerRows = async (
   source: ReadonlyArray<PerformanceRow>,
-  { onProgress, query = '', signal, sorting = [{ id: 'revenue', desc: true }] }: ExplorerRowsOptions = {}
+  { filters = [], onProgress, query = '', signal, sorting = [{ id: 'revenue', desc: true }] }: ExplorerRowsOptions = {}
 ): Promise<ExplorerRowsResult> => {
   assertNotAborted(signal)
 
-  const key = getExplorerKey(query, sorting)
+  const key = getExplorerKey(query, sorting, filters)
   const cachedResult = getCachedExplorerRows(source, key)
   if (cachedResult !== undefined) return cachedResult
 
   if (explorerTask?.source !== source || explorerTask.key !== key) {
     explorerTask?.controller.abort()
-    explorerTask = createExplorerTask(source, key, query, sorting)
+    explorerTask = createExplorerTask(source, key, query, sorting, filters)
   }
 
   const activeTask = explorerTask

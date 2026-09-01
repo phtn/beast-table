@@ -27,7 +27,13 @@ component PopoverDescription
     PopoverPrimitive.Description(data-slot="popover-description" className={cn("text-muted-foreground", className)} {...props})
 
 module
-  export { PopoverTrigger, PopoverContent, PopoverTitle, PopoverDescription, Popover.Trigger.Props as PopoverTriggerProps }
+  type PopoverProps = Parameters<typeof PopoverPrimitive.Root>[0]
+  type PopoverTriggerProps = Parameters<typeof PopoverPrimitive.Trigger>[0]
+  type PopoverContentProps = Parameters<typeof PopoverPrimitive.Popup>[0] &
+    Pick<Parameters<typeof PopoverPrimitive.Positioner>[0], "align" | "alignOffset" | "side" | "sideOffset">
+
+  export { PopoverTrigger, PopoverContent, PopoverTitle, PopoverDescription }
+  export type { PopoverProps, PopoverTriggerProps, PopoverContentProps }
 
 props {...props}: PopoverPrimitive.Root.Props
 fragment

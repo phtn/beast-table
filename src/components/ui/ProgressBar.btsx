@@ -41,7 +41,7 @@ div(
   ~ aria-valuenow={Number(normalizedValue.toFixed(0))}
   ~ )
   MotionDiv(
-    ~ className={`h-full w-full origin-left rounded-full will-change-transform ${tone === 'success' ? 'bg-success' : tone === 'error' ? 'bg-octane' : 'bg-[#ff415a]'}`}
+    ~ className={`h-full w-full origin-left rounded-full will-change-transform ${tone === 'success' ? 'bg-brand' : tone === 'error' ? 'bg-octane' : 'bg-[#ff415a]'}`}
     ~ initial={{ scaleX: 0 }}
     ~ animate={{ scaleX: progress }}
     ~ transition={transition}
