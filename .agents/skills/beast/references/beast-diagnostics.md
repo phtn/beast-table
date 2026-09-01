@@ -75,10 +75,10 @@ Specific boundary rules:
    bunx beast compile src/App.btsx --output /tmp/App.tsrx
    ```
 
-2. Check the authored shape in `references/beast-syntax-cheatsheet.md`.
+2. Check the authored shape in `references/beast-syntax-core.md` and load the control-flow or advanced syntax reference only when the failing construct needs it.
 3. Recompile and inspect the generated TSRX only where it clarifies the failure.
 4. If a recursive build fails, run `bunx beast build src --out-dir .beast` without watch first.
-5. If the bundler fails, check the matching adapter in `references/beast-build-tools.md`, then run the project's TSRX-aware typecheck and production build.
+5. If the bundler fails, check only its matching `references/beast-vite.md`, `references/beast-rspack.md`, or `references/beast-rsbuild.md`, then run the project's TSRX-aware typecheck and production build.
 
 Downstream Octane diagnostics may originate in generated TSRX, but Vite/Rspack source maps can trace them to BTSX. Patch BTSX, then rebuild.
 

@@ -7,7 +7,7 @@ module
     className?: NativeTableHeadProps['className']
   }
 
-  const baseClassName = 'sticky top-0 z-[2] h-[40px] border-b border-input/40 bg-sidebar px-4 py-0 text-left text-2xs font-extrabold uppercase tracking-[0.1em] text-muted-foreground backdrop-blur-sm'
+  const baseClassName = 'sticky top-0 z-[2] h-[40px] border-y border-r border-sidebar-border bg-sidebar px-2.5 py-0 text-left text-2xs font-extrabold uppercase tracking-[0.1em] text-muted-foreground backdrop-blur-sm'
 
 props { children, className, ...headProps }: Props
 

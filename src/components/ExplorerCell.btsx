@@ -1,0 +1,36 @@
+import { Badge, HealthMeter } from './ui'
+import { formatCurrency, formatRelativeTime } from '../data'
+
+module
+  interface Props {
+    column: { id: string }
+    getValue: () => unknown
+    row: { original: Record<string, any> }
+  }
+
+props { column, getValue, row }: Props
+
+if column.id === 'account'
+  div(className='flex min-w-0 items-center gap-2.5')
+    span(className='grid size-[28px] shrink-0 place-items-center rounded-full border border-input/50 bg-sidebar text-xs font-semibold tracking-normal text-muted-foreground' aria-hidden='true') #{String(row.original.account).slice(0, 2).toUpperCase()}
+    div(className='[&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
+      b #{String(row.original.account)}
+      small #{String(row.original.id)}
+elseif column.id === 'contact'
+  div(className='grid min-w-0 items-center gap-[3px] [&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
+    b #{String(row.original.contact)}
+elseif column.id === 'email'
+  div(className='grid min-w-0 items-center gap-[3px] [&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
+    b #{String(row.original.email)}
+elseif column.id === 'region'
+  small #{String(row.original.region)}
+elseif column.id === 'status'
+  Badge(tone={row.original.status === 'Healthy' ? 'success' : row.original.status === 'Watching' ? 'warning' : row.original.status === 'At risk' ? 'danger' : 'info'}) #{String(row.original.status)}
+elseif column.id === 'revenue'
+  b(className='font-mono text-[10px] font-[680] tabular-nums text-[#303530]') #{formatCurrency(Number(row.original.revenue))}
+elseif column.id === 'health'
+  HealthMeter(value={Number(row.original.health)})
+elseif column.id === 'updatedAt'
+  span(className='text-[#90968d]') #{formatRelativeTime(Number(row.original.updatedAt))}
+else
+  | #{String(getValue() ?? '—')}

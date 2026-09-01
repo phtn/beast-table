@@ -12,25 +12,25 @@
   },
   "dependencies": {
     "@faker-js/faker": "^10.6.0",
-    "@octanejs/base-ui": "^0.1.44",
-    "@octanejs/gsap": "^0.0.15",
-    "@octanejs/motion": "^0.1.45",
-    "@octanejs/nuqs": "^0.1.35",
-    "@octanejs/tanstack-table": "^0.1.43",
+    "@octanejs/base-ui": "^0.1.48",
+    "@octanejs/gsap": "^0.0.19",
+    "@octanejs/motion": "^0.1.49",
+    "@octanejs/nuqs": "^0.1.39",
+    "@octanejs/tanstack-table": "^0.1.47",
     "@tanstack/match-sorter-utils": "^9.1.2",
-    "beast-tsrx": "latest",
+    "beast-tsrx": "0.2.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "gsap": "^3.15.0",
-    "octane": "^0.1.46",
+    "octane": "^0.1.50",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.8",
-    "@tsrx/typescript-plugin": "0.3.118",
-    "@types/node": "^26.3.0",
+    "@tsrx/typescript-plugin": "0.3.128",
+    "@types/node": "^26.4.0",
     "tailwindcss": "^4.1.8",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vite": "^8.0.16"
   }
 }

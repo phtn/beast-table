@@ -5,9 +5,9 @@
 > Agent skill for authoring, diagnosing, and shipping Beast BTSX → TSRX → Octane apps across supported build tools.
 
 [![skills.sh](https://img.shields.io/badge/skills.sh-Beast-111827?style=flat-square)](https://skills.sh/phtn/beast-skill/beast)
-[![Version](https://img.shields.io/badge/version-0.2.0-6f42c1?style=flat-square)](package.json)
+[![Version](https://img.shields.io/badge/version-0.3.0-6f42c1?style=flat-square)](package.json)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A522.22.2-339933?style=flat-square&logo=nodedotjs&logoColor=white)](package.json)
-[![Octane](https://img.shields.io/badge/Octane-0.1.37-111827?style=flat-square)](https://octanejs.dev/)
+[![Octane](https://img.shields.io/badge/Octane-0.1.49-111827?style=flat-square)](https://octanejs.dev/)
 [![License: ISC](https://img.shields.io/badge/license-ISC-0f766e?style=flat-square)](LICENSE)
 
 **Scaffold in seconds. Author with indentation. Compile to native TSRX. Let Octane own rendering.**
@@ -17,6 +17,7 @@
 [CLI reference](#cli-reference) ·
 [Language server](#language-server) ·
 [Diagnostics](#diagnostics) ·
+[Changelog](CHANGELOG.md) ·
 [Development](#development)
 
 ---
@@ -31,6 +32,7 @@ It does not replace TypeScript, TSRX, Octane, or an application bundler. It owns
 | --- | --- | --- |
 | Scaffold | Creates a typed Beast + Octane + Vite app, optionally with Tailwind | Starts with a coherent toolchain |
 | Author | Indentation-based BTSX with typed props | Keeps structure, keeps types |
+| Scope | Places setup and hooks in an exact child position | Preserves child ownership without a wrapper element |
 | Compile | BTSX → native TSRX (readable) | Octane remains authority |
 | Diagnose | Stable codes + source spans | Makes failures actionable |
 | Edit | Beast-aware completion, navigation, hover, and workspace references | Keeps editor guidance aligned with BTSX |
@@ -163,7 +165,12 @@ beast build [source-dir] [--out-dir <directory>] [--no-validate] [--watch]
 | `build` | Recursive mixed BTSX/TSRX build, validates natives, writes a manifest, and prunes tracked stale outputs after success |
 | `build --watch` | Debounced, serialized rebuilds that report errors and recover after later edits |
 
-Detailed CLI and bundler configuration: [references/beast-build-tools.md](references/beast-build-tools.md).
+Detailed references:
+
+- [Scaffolding and CLI](references/beast-cli.md)
+- [Vite](references/beast-vite.md)
+- [Rspack](references/beast-rspack.md)
+- [Rsbuild](references/beast-rsbuild.md)
 
 ### App scripts (generated template)
 
@@ -223,15 +230,29 @@ beast-skill/
 ├── SKILL.md                          # Agent workflow and trust boundary
 ├── agents/openai.yaml                # Agent-facing metadata
 ├── references/
-│   ├── beast-syntax-cheatsheet.md    # BTSX authoring reference
+│   ├── beast-syntax-core.md          # Ordinary BTSX authoring
+│   ├── beast-syntax-control.md       # Conditions, lists, switches, boundaries
+│   ├── beast-syntax-advanced.md      # Continuations, styles, maps
+│   ├── octane-hooks-core.md           # State, context, refs, and hook placement
+│   ├── octane-hooks-effects.md        # Effects, stores, and custom hooks
+│   ├── octane-hooks-async.md          # Suspense, transitions, and actions
+│   ├── ui-component-authoring.md      # Reusable UI component architecture
+│   ├── octane-bindings.md             # Design-system and library bindings
+│   ├── octane-tanstack-form.md         # Form state, fields, and validation
+│   ├── octane-tanstack-table.md        # Typed table models and rendering
 │   ├── beast-diagnostics.md          # Error codes and fixes
-│   ├── beast-build-tools.md          # CLI, watch, source maps, and bundler adapters
+│   ├── beast-cli.md                  # Scaffold, compile, build, and watch
+│   ├── beast-vite.md                 # Vite adapter
+│   ├── beast-rspack.md               # Rspack adapter
+│   ├── beast-rsbuild.md              # Rsbuild adapter
 │   ├── beast-language-server.md      # LSP setup, capabilities, and boundaries
 │   ├── beast-coverage.md             # Octane parity map
-│   └── ui-components.md              # Compelling project UI component contracts
+│   └── ui-components.md              # Compelling project UI index
 ├── scripts/
 │   ├── beast-doctor.cjs              # Portable bounded checker
-│   └── src/beast-doctor.ts           # Source of truth
+│   ├── src/beast-doctor.ts           # Source of truth
+│   └── sync-installed-skill.cjs      # Keeps the active local mirror in sync
+├── CHANGELOG.md                       # Skill release notes
 ├── package.json
 └── tsconfig.json
 ```
@@ -244,6 +265,10 @@ Requirements: Node.js 22.22.2 or newer.
 npm ci
 npm run check
 ```
+
+After changing skill files, run `npm run sync:skill`. When the local
+`.agents/skills/beast` mirror exists, `npm run check` fails if it has drifted
+from the root source. The ignored mirror is not part of the published skill.
 
 When changing the doctor:
 

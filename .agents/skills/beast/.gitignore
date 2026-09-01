@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# Local agent installation mirror
+.agents/
+skills-lock.json
+
 # Build output
 dist/
 *.tsbuildinfo

@@ -1,17 +1,18 @@
 import { createColumnHelper, flexRender, functionalUpdate, useTable } from '@octanejs/tanstack-table'
-import type { PaginationState, SortingState } from '@octanejs/tanstack-table'
+import type { PaginationState, RowData, SortingState } from '@octanejs/tanstack-table'
 import { parseAsBoolean, parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from '@octanejs/nuqs'
-import { useEffect, useMemo, useState, useRef } from 'octane'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'octane'
 import { Badge, Button, Checkbox, HealthMeter, Input, Metric, Select, Header } from './ui'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
-import { formatCurrency, formatRelativeTime, prepareExplorerRows, SEED_ROW_COUNTS } from '../data'
+import { prepareExplorerRows, SEED_ROW_COUNTS } from '../data'
 import type { ExplorerProgress, PerformanceRow, SeedRowCount } from '../data'
 import { explorerFeatures } from '../table-config'
 import {gsap} from 'gsap'
 import { useGSAP } from '@octanejs/gsap'
 import { TABLE_QUERY_LIMITS } from './ui/table/hyper/Parsers'
-
-
+import HyperRow from './ui/table/hyper/HyperRow.btsx'
+import type { ColumnPinningState } from '@octanejs/tanstack-table'
+import type { PinnedColumnLayout } from './ui/table/hyper/ColumnPinning.ts'
 module
   interface Props {
     onSeedCountChange: (rowCount: SeedRowCount) => void
@@ -81,11 +82,22 @@ module
       header: 'Select',
       enableHiding: false,
       enableSorting: false,
+      defaultPinned: 'start',
     }),
-    columnHelper.accessor('account', { header: 'Account', sortFn: 'text' }),
-    columnHelper.accessor('contact', { header: 'Owner', sortFn: 'text' }),
-    columnHelper.accessor('email', { header: 'Email', sortFn: 'text' }),
-    columnHelper.accessor('region', { header: 'Region', sortFn: 'text' }),
+
+
+
+
+
+
+
+
+
+
+
+    columnHelper.accessor('contact', { header: '⯐ Contact', sortFn: 'text',  }),
+    columnHelper.accessor('account', { header: '𜲉 Account', sortFn: 'text', defaultPinned: 'start' }),
+    columnHelper.accessor('region', { header: '⛱ Region', sortFn: 'text' }),
     columnHelper.accessor('status', { header: 'Status', sortFn: 'text' }),
     columnHelper.accessor('revenue', { header: 'ARR', sortFn: 'basic' }),
     columnHelper.accessor('health', { header: 'Health', sortFn: 'basic' }),
@@ -108,7 +120,11 @@ module
   const formatSeedRowCount = (rowCount: SeedRowCount) =>
     rowCount === 1_000_000 ? '1M' : `${rowCount / 1_000}k`
 
+  const explorerColumnPinning: ColumnPinningState = { start: [''], end: [] }
+  const emptyPinnedColumnLayouts: ReadonlyMap<string, PinnedColumnLayout> = new Map()
+
 props { onSeedCountChange, rows, seedCount, seedDurationMs }: Props
+
 setup
   const [{ q: globalFilter, page, size, sort, desc }, setExplorerQuery] = useQueryStates(
     explorerQueryParsers,
@@ -401,6 +417,7 @@ setup
     (state) => ({
       globalFilter: state.globalFilter,
       pagination: state.pagination,
+      columnVisibility: state.columnVisibility,
       rowSelection: state.rowSelection,
       sorting: state.sorting,
     }),
@@ -425,7 +442,7 @@ setup
     onSeedCountChange(nextSeedCount)
   }
 
-section(className='relative rounded-[0.95em] md:rounded-[0.92em] border border-input/70 bg-background shadow-[0_1px_2px_rgba(28,34,26,0.04)]' aria-labelledby='explorer-heading')
+section(className='relative rounded-[0.95em] md:rounded-[0.90em] lg:rounded-[0.84em] border border-input/70 bg-background shadow-[0_1px_2px_rgba(28,34,26,0.04)]' aria-labelledby='explorer-heading')
   div(className='absolute -top-1.25 md:-top-2 -left-0.25 md:-left-2 rounded-l-full border-r border-input/70 bg-muted w-2 md:w-4 h-4 rotate-45')
   div(className='absolute -top-1.25 md:-top-2 -right-0.25 md:-right-2 rounded-r-full border-l border-input/70 bg-muted w-2 md:w-4 h-4 -rotate-45')
   div(className='absolute -bottom-0.25 md:-bottom-2 -right-1.25 md:-right-2 rounded-b-full border-t border-input/70 bg-muted w-4 h-2 md:h-4 -rotate-45')
@@ -449,9 +466,11 @@ section(className='relative rounded-[0.95em] md:rounded-[0.92em] border border-i
         ~ type='search'
         ~ className='py-0 px-3'
         ~ value={query}
-        ~ placeholder='Search account, owner, region…'
+        ~ placeholder='Search contacts, account, region…'
         ~ onInput={(event) => table.setGlobalFilter((event.currentTarget as HTMLInputElement).value)}
         ~ )
+    // Pop
+
     div(className='flex items-center gap-2.5 text-xs text-muted-foreground max-[680px]:flex-wrap')
       if isQuerying
         span(className='inline-flex items-center gap-[9px]')
@@ -468,15 +487,15 @@ section(className='relative rounded-[0.95em] md:rounded-[0.92em] border border-i
       span(className='text-[#bbc0b8]' aria-hidden='true') ·
       span #{selectedCount} selected
 
-  div(className='border-t border-input/50')
-    div(className='max-h-[min(590px,63vh)] w-full overflow-auto scrollbar-track-sidebar scrollbar-thumb-taupe-600 scrollbar-thin scroll-smooth')
+  div(className='')
+    div(className='max-h-[min(590px,64vh)] w-full overflow-auto scrollbar-track-sidebar scrollbar-thumb-slate-400 scrollbar-thin scroll-smooth')
       Table(className='min-w-[1180px]')
         TableHeader
           each headerGroup in table.getHeaderGroups() key headerGroup.id
             TableRow
               each header in headerGroup.headers key header.id
                 TableHead(
-                  ~ className={header.column.id === 'select' ? 'w-12 pr-2! pl-[18px]! text-center!' : ''}
+                  ~ className={header.column.id === 'select' ? 'ps-6' : ''}
                   ~ scope='col'
                   ~ )
                   if header.column.id === 'select'
@@ -490,56 +509,34 @@ section(className='relative rounded-[0.95em] md:rounded-[0.92em] border border-i
                       ~ type='button'
                       ~ variant='ghost'
                       ~ size='none'
-                      ~ className='inline-flex w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent px-0 py-[5px] text-left text-[inherit] [font-weight:inherit] uppercase tracking-[inherit] disabled:cursor-default'
+                      ~ className='inline-flex w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent px-0 py-1.5 text-sm text-left text-[inherit] [font-weight:inherit] capitalize tracking-tight disabled:cursor-default'
                       ~ disabled={!header.column.getCanSort()}
                       ~ onClick={header.column.getToggleSortingHandler()}
                       ~ )
                       span #{header.isPlaceholder ? '' : flexRender(header.column.columnDef.header, header.getContext())}
-                      span(className='text-2xs text-muted-foreground' aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
+                      span(className='text-2xs text-muted-foreground' aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '⯅' : header.column.getIsSorted() === 'desc' ? '⯆' : '⯌'}
         TableBody(ref={rowMotionRootRef})
           each row in visibleRows key row.id
-            TableRow(data-reorder-row-id={row.id} className={row.getIsSelected() ? 'bg-sidebar!' : ''})
-              each cell in row.getVisibleCells() key cell.id
-                TableCell(className={cell.column.id === 'select' ? 'w-12 pr-2! pl-[18px]! text-center!' : cell.column.id === 'revenue' || cell.column.id === 'health' ? 'text-right' : ''})
-                  if cell.column.id === 'select'
-                    Checkbox(
-                      ~ aria-label={`Select ${row.original.account}`}
-                      ~ checked={row.getIsSelected()}
-                      ~ onChange={row.getToggleSelectedHandler()}
-                      ~ )
-                  elseif cell.column.id === 'account'
-                    div(className='flex min-w-0 items-center gap-2.5')
-                      span(className='grid size-[28px] shrink-0 place-items-center rounded-sm border border-input/50 bg-sidebar text-xs font-semibold tracking-normal text-muted-foreground' aria-hidden='true') #{row.original.account.slice(0, 2).toUpperCase()}
-                      div(className='[&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_b]:text-[#242824] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
-                        b #{row.original.account}
-                        small #{row.original.id}
-                  elseif cell.column.id === 'contact'
-                    div(className='grid min-w-0 items-center gap-[3px] [&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_b]:text-[#242824] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
-                      b #{row.original.contact}
-                  elseif cell.column.id === 'email'
-                    div(className='grid min-w-0 items-center gap-[3px] [&_b]:block [&_b]:max-w-[230px] [&_b]:overflow-hidden [&_b]:text-ellipsis [&_b]:text-[11px] [&_b]:font-bold [&_b]:tracking-[-0.015em] [&_b]:text-[#242824] [&_small]:block [&_small]:max-w-[230px] [&_small]:overflow-hidden [&_small]:text-ellipsis [&_small]:font-mono [&_small]:text-[8px] [&_small]:tracking-[0.01em] [&_small]:text-[#969c93]')
-                      b #{row.original.email}
-                  elseif cell.column.id === 'email'
-                    small #{row.original.region}
-                  elseif cell.column.id === 'region'
-                    small #{row.original.region}
-                  elseif cell.column.id === 'status'
-                    Badge(tone={row.original.status === 'Healthy' ? 'success' : row.original.status === 'Watching' ? 'warning' : row.original.status === 'At risk' ? 'danger' : 'info'}) #{row.original.status}
-                  elseif cell.column.id === 'revenue'
-                    b(className='font-mono text-[10px] font-[680] tabular-nums text-[#303530]') #{formatCurrency(row.original.revenue)}
-                  elseif cell.column.id === 'health'
-                    HealthMeter(value={row.original.health})
-                  elseif cell.column.id === 'updatedAt'
-                    span(className='text-[#90968d]') #{formatRelativeTime(row.original.updatedAt)}
-                  else
-                    | #{String(cell.getValue() ?? '—')}
+            HyperRow(
+              ~ row={row}
+              ~ dropPosition={dropTarget?.rowId === row.id ? dropTarget.position : null}
+              ~ isActive={false}
+              ~ isDragging={draggedRowId === row.id}
+              ~ isEditing={false}
+              ~ isPinned={false}
+              ~ isSelected={row.getIsSelected()}
+              ~ showSelectColumn={true}
+              ~ columnPinning={explorerColumnPinning}
+              ~ columnVisibility={table.state.columnVisibility}
+              ~ pinnedColumnLayouts={emptyPinnedColumnLayouts}
+              ~ )
           empty
             TableRow
               TableCell(className='h-[300px]! text-center! text-[#8b9188]! [&_b]:mb-[7px] [&_b]:block [&_b]:text-sm [&_b]:text-[#454a43] [&_span]:block' colSpan={table.getVisibleLeafColumns().length})
                 b No matching accounts
                 span Try a shorter query or clear the search.
 
-    footer(className='grid min-h-[50px] grid-cols-[1fr_auto_auto] items-center gap-5 border-t border-input/50 bg-sidebar px-4 py-[9px] text-[10px] font-semibold text-[#81877e] max-[680px]:grid-cols-[1fr_auto] [&_p]:m-0 [&_p:nth-child(2)]:text-center max-[680px]:[&_p:nth-child(2)]:hidden')
+    footer(className='flex items-center justify-between min-h-[50px] gap-5 border-t border-input/50 bg-sidebar px-4 py-[9px] text-[10px] font-semibold text-[#81877e] max-[680px]:grid-cols-[1fr_auto] [&_p]:m-0 [&_p:nth-child(2)]:text-center max-[680px]:[&_p:nth-child(2)]:hidden')
       div(className='flex items-center gap-2')
         label(for='explorer-page-size') Rows
         select#explorer-page-size(
@@ -551,9 +548,14 @@ section(className='relative rounded-[0.95em] md:rounded-[0.92em] border border-i
           option(value='15') 15
           option(value='25') 25
           option(value='50') 50
-      p(className='font-normal text-soft') Page #{table.state.pagination.pageIndex + 1} of #{Math.max(1, table.getPageCount()).toLocaleString()}
-      div(className='flex items-center rounded-md border border-input/50 divide-x divide-input/50 bg-background overflow-hidden')
-        Button(className='rounded-none disabled:opacity-40' variant='ghost' size='icon' aria-label='First page' disabled={!table.getCanPreviousPage()} onClick={() => table.firstPage()}) «
-        Button(className='rounded-none disabled:opacity-40' variant='ghost' size='icon' aria-label='Previous page' disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}) ‹
-        Button(className='rounded-none disabled:opacity-40' variant='ghost' size='icon' aria-label='Next page' disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}) ›
-        Button(className='rounded-none disabled:opacity-40' variant='ghost' size='icon' aria-label='Last page' disabled={!table.getCanNextPage()} onClick={() => table.lastPage()}) »
+
+      div(className='flex items-center gap-4')
+        a(className='text-right' aria-hidden='true' href='https://beast-docs.vercel.app' target='_blank' rel='noopener noreferrer')
+        | Beast Docs
+      div(className='flex items-center justify-between gap-4')
+        p(className='font-normal text-soft') Page #{table.state.pagination.pageIndex + 1} of #{Math.max(1, table.getPageCount()).toLocaleString()}
+        div(className='flex items-center rounded-md border border-input/50 divide-x divide-input/50 bg-background overflow-hidden')
+          Button(className='rounded-none disabled:opacity-40' variant='ghost' size='icon' aria-label='First page' disabled={!table.getCanPreviousPage()} onClick={() => table.firstPage()}) «
+          Button(className='rounded-none disabled:opacity-40' variant='ghost' size='icon' aria-label='Previous page' disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}) ‹
+          Button(className='rounded-none disabled:opacity-40' variant='ghost' size='icon' aria-label='Next page' disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}) ›
+          Button(className='rounded-none disabled:opacity-40' variant='ghost' size='icon' aria-label='Last page' disabled={!table.getCanNextPage()} onClick={() => table.lastPage()}) »
