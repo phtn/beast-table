@@ -315,6 +315,30 @@ export const icons = {
     symbol: '<g transform="scale(0.667)"><path d="M21 4v2h-1l-6 9v7h-4v-7L4 6H3V4z" fill="currentColor"/></g>',
     viewBox: '0 0 16 16',
     set: 'svg'
+  },
+  'no-filter': {
+    symbol:
+      '<g transform="scale(0.667)"><path d="M6.929.515 21.07 14.657l-1.414 1.414-3.823-3.822L14 14.999v7h-4v-7L4 6H3V4h4.585l-2.07-2.07zM21 4v2h-1l-1.915 2.872L13.213 4z" fill="currentColor"/></g>',
+    viewBox: '0 0 16 16',
+    set: 'svg'
+  },
+  draggable: {
+    symbol:
+      '<path d="M5.67 4.669a1 1 0 1 0 0-2.001 1 1 0 0 0 0 2.001m0 4.336a1 1 0 1 0 0-2.002 1 1 0 0 0 0 2.002m1 3.334a1 1 0 1 1-2.001 0 1 1 0 0 1 2.001 0m3.669-7.67a1 1 0 1 0 0-2.001 1 1 0 0 0 0 2.001m1 3.335a1 1 0 1 1-2.001 0 1 1 0 0 1 2.001 0m-1 5.336a1 1 0 1 0 0-2.001 1 1 0 0 0 0 2.001" fill="currentColor"/>',
+    viewBox: '0 0 16 16',
+    set: 'svg'
+  },
+  'arrow-right-col': {
+    symbol:
+      '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8m0 4h17m-3-3l3 3l-3 3"/>',
+    viewBox: '0 0 24 24',
+    set: 'tabler'
+  },
+  cols: {
+    symbol:
+      '<g transform="scale(0.667)"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 4v16m6-16v16M5 20h14a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1"/></g>',
+    viewBox: '0 0 16 16',
+    set: 'svg'
   }
 }
 

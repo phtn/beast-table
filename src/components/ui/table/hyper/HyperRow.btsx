@@ -50,9 +50,9 @@ setup
 TableRow(data-state={isSelected ? 'selected' : undefined}
   ~ data-drop-position={dropPosition ?? undefined}
   ~ data-reorder-row-id={row.id}
-  ~ className={cn('group/row h-10 text-foreground transition-[background-color,border-color,color,box-shadow] duration-150 ease-out hover:border-y-dark-table/30 hover:bg-brand/5 active:bg-background/20 dark:hover:bg-background/80', {
+  ~ className={cn('group/row h-10 text-foreground bg-surface active:bg-background/20 dark:hover:bg-background/80', {
       ~ 'dark:bg-blue-200/50': isHighlighted,
-      ~ 'bg-brand/8 hover:bg-brand/15 last:rounded-tr-2xl dark:bg-brand/20': isSelected && !isHighlighted,
+      ~ 'bg-active hover:bg-brand/15 last:rounded-tr-2xl dark:bg-brand/20': isSelected && !isHighlighted,
       ~ 'bg-sky-300/20 hover:bg-brand/10 dark:bg-background/20 dark:hover:bg-background/30': isPinned && !isHighlighted && !isSelected,
       ~ 'cursor-pointer': showSelectColumn && row.getCanSelect(),
       ~ 'relative z-10 bg-background/95 shadow-[0_10px_26px_-18px_hsl(var(--foreground)/0.55)]': isDragging,

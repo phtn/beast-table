@@ -5,6 +5,7 @@ import type { JSX } from 'octane/jsx-runtime'
 import Popover, { PopoverContent, PopoverTrigger } from './Popover.btsx'
 import type { PopoverContentProps, PopoverProps, PopoverTriggerProps } from './Popover.btsx'
 import { cn } from '@/lib/utils'
+import {Checkbox} from "@/components/ui";
 
 module
   const FACETED_NAME = 'Faceted'
@@ -202,7 +203,7 @@ component FacetedContent
     ~ align='start'
     ~ sideOffset={8}
     ~ className={cn(
-    ~   'w-50 origin-(--transform-origin) rounded-md border border-indigo-400 bg-transparent p-0 ring-0 dark:border-indigo-200/30',
+    ~   'w-64 origin-(--transform-origin) rounded-md border border-border/60 bg-transparent p-0 ring-0 dark:border-indigo-200/30 overflow-hidden',
     ~   className
     ~ )}
     ~ onFocus={onFocus}
@@ -227,7 +228,7 @@ component FacetedList
     ~ data-slot='faceted-list'
     ~ {...listProps}
     ~ ref={ref}
-    ~ className={cn('max-h-75 overflow-x-hidden overflow-y-auto scroll-py-1', className)}
+    ~ className={cn('max-h-75 overflow-x-hidden overflow-y-auto scroll-py-1 ', className)}
     ~ )
     | #{children}
 
@@ -247,7 +248,7 @@ component FacetedGroup
     ~ data-slot='faceted-group'
     ~ {...groupProps}
     ~ ref={ref}
-    ~ className={cn('overflow-hidden p-1 text-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground', className)}
+    ~ className={cn('overflow-hidden text-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground', className)}
     ~ )
     | #{children}
 
@@ -284,13 +285,14 @@ component FacetedItem
     ~ value={value}
     ~ aria-selected={isSelected}
     ~ data-selected={isSelected}
-    ~ className={cn('relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden data-[disabled=true]:pointer-events-none data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground data-[disabled=true]:opacity-50', className)}
+    ~ className={cn('relative flex cursor-default select-none items-center gap-2 ps-2 pe-3 py-2 text-sm outline-hidden hover:bg-white! data-[disabled=true]:pointer-events-none data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground data-[disabled=true]:opacity-50', className)}
     ~ onSelect={onItemSelect}
     ~ )
-    SelectionIcon(
-      ~ selected={isSelected}
-      ~ className={cn('size-5 text-foreground/70', isSelected && 'text-indigo-500 dark:text-indigo-400')}
-      ~ )
+    Checkbox(checked={isSelected} onChange={onItemSelect})
+    // SelectionIcon(
+    //   ~ selected={isSelected}
+    //   ~ className={cn('size-5 text-foreground/70', isSelected && 'text-indigo-500 dark:text-indigo-400')}
+    //   ~ )
     | #{children}
 
 module

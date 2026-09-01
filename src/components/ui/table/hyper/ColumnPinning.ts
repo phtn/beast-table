@@ -17,14 +17,32 @@ interface ColumnLike {
 }
 
 interface SizedColumnLike extends ColumnLike {
+  columnDef?: {
+    maxSize?: number
+    minSize?: number
+    size?: number
+  }
   getCanHide: () => boolean
-  getSize: () => number
+  getSize?: () => number
 }
 
 export interface PinnedColumnLayout {
   isBoundary: boolean
   offset: number
   position: DefaultColumnPinningPosition
+}
+
+const DEFAULT_COLUMN_SIZE = 150
+const DEFAULT_MIN_COLUMN_SIZE = 20
+const DEFAULT_MAX_COLUMN_SIZE = Number.MAX_SAFE_INTEGER
+
+export const getColumnSize = (column: SizedColumnLike) => {
+  if (typeof column.getSize === 'function') return column.getSize()
+
+  const size = column.columnDef?.size ?? DEFAULT_COLUMN_SIZE
+  const minSize = column.columnDef?.minSize ?? DEFAULT_MIN_COLUMN_SIZE
+  const maxSize = column.columnDef?.maxSize ?? DEFAULT_MAX_COLUMN_SIZE
+  return Math.min(Math.max(minSize, size), maxSize)
 }
 
 export const getDefaultColumnPinning = (columns: readonly DeclarativePinnedColumn[]): ColumnPinningState => ({
@@ -111,7 +129,7 @@ export const getPinnedColumnLayouts = (
       offset: startOffset,
       position: 'start'
     })
-    if (isVisible(column)) startOffset += column.getSize()
+    if (isVisible(column)) startOffset += getColumnSize(column)
   }
 
   let endOffset = 0
@@ -122,7 +140,7 @@ export const getPinnedColumnLayouts = (
       offset: endOffset,
       position: 'end'
     })
-    if (isVisible(column)) endOffset += column.getSize()
+    if (isVisible(column)) endOffset += getColumnSize(column)
   }
 
   return layouts

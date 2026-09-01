@@ -1,5 +1,4 @@
-import type { Column, RowData } from '@octanejs/tanstack-table'
-import { features } from './Features'
+import type { Column, RowData, TableFeatures } from '@octanejs/tanstack-table'
 import { TABLE_QUERY_LIMITS } from './parsers'
 
 const FILTER_OBJECT_LABEL_KEYS = ['label', 'name', 'title', 'slug', 'id', '_id', 'value'] as const
@@ -162,7 +161,9 @@ export const formatColumnId = (id: string): string => {
     .join(' ')
 }
 
-export const getColumnHeaderText = <TData extends RowData>(column: Column<typeof features, TData, unknown>): string => {
+export const getColumnHeaderText = <TFeatures extends TableFeatures, TData extends RowData>(
+  column: Column<TFeatures, TData, unknown>
+): string => {
   const header = column.columnDef.header
 
   if (typeof header === 'string') {

@@ -3,6 +3,8 @@ import {
   aggregationFn_sum,
   columnFilteringFeature,
   columnGroupingFeature,
+  columnOrderingFeature,
+  columnPinningFeature,
   columnResizingFeature,
   columnSizingFeature,
   columnVisibilityFeature,
@@ -42,6 +44,9 @@ export const explorerFeatures = tableFeatures({
   rowPaginationFeature,
   paginatedRowModel: createPaginatedRowModel(),
   rowSelectionFeature,
+  columnOrderingFeature,
+  columnPinningFeature,
+  columnSizingFeature,
   columnVisibilityFeature,
 })
 

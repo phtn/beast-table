@@ -1,6 +1,7 @@
 import { parseAsStringEnum } from '@octanejs/nuqs'
 import type {
   ColumnFiltersState,
+  ColumnOrderState,
   RowPinningState,
   RowSelectionState,
   SortingState,
@@ -133,8 +134,10 @@ export const createColumnFiltersParser = () => ({
       if (!isSafeObjectKey(columnId) || seenColumnIds.has(columnId)) continue
 
       const rawValues = colonIndex >= 0 ? group.slice(colonIndex + 1) : ''
+      // Filter values are positional for range filters, so keep empty and
+      // duplicate entries (for example `updatedAt:,2026-09-01`).
       const values = rawValues
-        ? uniqueBoundedTokens(rawValues.split(','), TABLE_QUERY_LIMITS.filterValuesPerColumn)
+        ? rawValues.split(',').slice(0, TABLE_QUERY_LIMITS.filterValuesPerColumn).map(decodeToken)
         : []
 
       seenColumnIds.add(columnId)
@@ -158,7 +161,8 @@ export const createColumnFiltersParser = () => ({
       .join('|')
       .slice(0, TABLE_QUERY_LIMITS.serializedStateCharacters)
   },
-  defaultValue: [] as ColumnFiltersState
+  defaultValue: [] as ColumnFiltersState,
+  eq: (left: ColumnFiltersState, right: ColumnFiltersState) => JSON.stringify(left) === JSON.stringify(right)
 })
 
 // Column visibility format: "encoded-id" for hidden columns and
@@ -200,7 +204,27 @@ export const createColumnVisibilityParser = (defaultColumnVisibility: Visibility
       .join(',')
       .slice(0, TABLE_QUERY_LIMITS.serializedStateCharacters)
   },
-  defaultValue: defaultColumnVisibility
+  defaultValue: defaultColumnVisibility,
+  eq: (left: VisibilityState, right: VisibilityState) => {
+    const columnIds = new Set([...Object.keys(left), ...Object.keys(right)])
+    return Array.from(columnIds).every((id) => (left[id] !== false) === (right[id] !== false))
+  }
+})
+
+// Column order format: comma-separated, individually encoded column IDs.
+export const createColumnOrderParser = () => ({
+  parse: (value: string | null): ColumnOrderState =>
+    uniqueBoundedTokens(trimStateValue(value).split(','), TABLE_QUERY_LIMITS.visibilityEntries, true),
+  serialize: (value: ColumnOrderState): string =>
+    (value ?? [])
+      .filter(isSafeObjectKey)
+      .slice(0, TABLE_QUERY_LIMITS.visibilityEntries)
+      .map(encodeToken)
+      .join(',')
+      .slice(0, TABLE_QUERY_LIMITS.serializedStateCharacters),
+  defaultValue: [] as ColumnOrderState,
+  eq: (left: ColumnOrderState, right: ColumnOrderState) =>
+    left.length === right.length && left.every((id, index) => id === right[index])
 })
 
 // Row selection format: comma-separated, individually encoded stable row IDs.

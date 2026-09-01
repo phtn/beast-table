@@ -1,3 +1,5 @@
+import { subSlot, useCallback } from 'octane'
+
 /**
  * A utility to compose multiple event handlers into a single event handler.
  * Run originalEventHandler first, then ourEventHandler unless prevented.
@@ -25,6 +27,8 @@ type RefCallback<T> = {
 }['bivarianceHack']
 type Ref<T> = RefCallback<T> | { current: T | null } | null
 type PossibleRef<T> = Ref<T> | undefined
+
+const COMPOSED_REFS_SLOT = Symbol.for('table:useComposedRefs')
 
 /**
  * Set a given ref to a given value.
@@ -77,8 +81,13 @@ function composeRefs<T>(...refs: Array<PossibleRef<T>>): RefCallback<T> {
  * A custom hook that composes multiple refs.
  * Accepts callback refs and RefObject(s).
  */
-function useComposedRefs<T>(...refs: Array<PossibleRef<T>>): RefCallback<T> {
-  return composeRefs(...refs)
+function useComposedRefs<T>(...args: any[]): RefCallback<T> {
+  const tail = args[args.length - 1]
+  const injectedSlot = typeof tail === 'symbol' ? tail : undefined
+  const refs = (injectedSlot ? args.slice(0, -1) : args) as Array<PossibleRef<T>>
+  const slot = injectedSlot ?? COMPOSED_REFS_SLOT
+
+  return useCallback(composeRefs(...refs), refs, subSlot(slot, 'callback'))
 }
 
 export { composeEventHandlers, composeRefs, useComposedRefs }

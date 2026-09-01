@@ -1,19 +1,21 @@
-import { createColumnHelper, flexRender, functionalUpdate, useTable } from '@octanejs/tanstack-table'
-import type { ColumnFiltersState, PaginationState, RowData, SortingState } from '@octanejs/tanstack-table'
+import { createColumnHelper, functionalUpdate, useTable } from '@octanejs/tanstack-table'
+import type { ColumnVisibilityState, PaginationState, RowData, SortingState } from '@octanejs/tanstack-table'
 import { parseAsBoolean, parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from '@octanejs/nuqs'
 import { useCallback, useEffect, useMemo, useState, useRef } from 'octane'
-import { Badge, Button, Checkbox, HealthMeter, Input, Metric, NativeSelect, Header } from './ui'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
+import { Badge, Button, HealthMeter, Input, Metric, NativeSelect, Header } from './ui'
+import { TableBody, TableCell, TableRow } from './ui/table'
 import { prepareExplorerRows, SEED_ROW_COUNTS } from '../data'
 import type { ExplorerProgress, PerformanceRow, SeedRowCount } from '../data'
 import { explorerFeatures } from '../table-config'
 import {gsap} from 'gsap'
 import { useGSAP } from '@octanejs/gsap'
-import { TABLE_QUERY_LIMITS } from './ui/table/hyper/Parsers'
+import { createColumnFiltersParser, createColumnOrderParser, createColumnVisibilityParser, TABLE_QUERY_LIMITS } from './ui/table/hyper/parsers'
 import HyperRow from './ui/table/hyper/HyperRow.btsx'
+import HyperTable from './ui/table/hyper/Table.btsx'
+import ColumnView from './ui/table/hyper/ColumnView.btsx'
 import FilterList from './explorer-table/FilterList.btsx'
 import type { ColumnPinningState } from '@octanejs/tanstack-table'
-import type { PinnedColumnLayout } from './ui/table/hyper/ColumnPinning.ts'
+import { getPinnedColumnLayouts, orderColumnsByPinning } from './ui/table/hyper/ColumnPinning.ts'
 module
   interface Props {
     onSeedCountChange: (rowCount: SeedRowCount) => void
@@ -68,20 +70,24 @@ module
   }
 
   const columnHelper = createColumnHelper<typeof explorerFeatures, PerformanceRow>()
-  const explorerSortIds = ['account', 'owner', 'email', 'region', 'status', 'revenue', 'health', 'updatedAt'] as const
+  const explorerSortIds = ['account', 'contact', 'region', 'status', 'revenue', 'health', 'updatedAt'] as const
+  const explorerDefaultColumnVisibility: ColumnVisibilityState = { email: false }
   const explorerQueryParsers = {
     q: parseAsString.withDefault(''),
     page: parseAsInteger.withDefault(1),
     size: parseAsInteger.withDefault(15),
     sort: parseAsStringLiteral(explorerSortIds).withDefault('revenue'),
     desc: parseAsBoolean.withDefault(true),
+    filters: createColumnFiltersParser(),
+    visibility: createColumnVisibilityParser(explorerDefaultColumnVisibility),
+    order: createColumnOrderParser(),
   }
   const explorerPageSizes = [25, 100, 250, 1000]
   const columns = columnHelper.columns([
     columnHelper.display({
       id: 'select',
       header: 'Select',
-      size: 40,
+      size: 50,
       enableColumnFilter: false,
       enableHiding: false,
       enableSorting: false,
@@ -92,7 +98,7 @@ module
 
 
     columnHelper.accessor('contact', { header: 'Contact', size: 280, sortFn: 'text', enableColumnFilter: false }),
-    columnHelper.accessor('account', { header: 'Account', size: 300, sortFn: 'text', enableColumnFilter: false, defaultPinned: 'start' }),
+    columnHelper.accessor('account', { header: 'Account', size: 300, sortFn: 'text', enableColumnFilter: false }),
     columnHelper.accessor('region', { header: 'Region', size: 300, sortFn: 'text', filterFn: 'arrHas', enableColumnFilter: true }),
     columnHelper.accessor('status', { header: 'Status', size: 300, sortFn: 'text', filterFn: 'arrHas', enableColumnFilter: true }),
     columnHelper.accessor('revenue', { header: 'ARR', size: 300, sortFn: 'basic', filterFn: 'inNumberRange', enableColumnFilter: true }),
@@ -119,13 +125,12 @@ module
   const formatSeedRowCount = (rowCount: SeedRowCount) =>
     rowCount === 1_000_000 ? '1M' : `${rowCount / 1_000}k`
 
-  const explorerColumnPinning: ColumnPinningState = { start: [''], end: [] }
-  const emptyPinnedColumnLayouts: ReadonlyMap<string, PinnedColumnLayout> = new Map()
+  const explorerColumnPinning: ColumnPinningState = { start: ['select'], end: [] }
 
 props { onSeedCountChange, rows, seedCount, seedDurationMs }: Props
 
 setup
-  const [{ q: globalFilter, page, size, sort, desc }, setExplorerQuery] = useQueryStates(
+  const [{ q: globalFilter, page, size, sort, desc, filters: columnFilters, visibility: columnVisibility, order: columnOrder }, setExplorerQuery] = useQueryStates(
     explorerQueryParsers,
     { history: 'replace' },
   )
@@ -140,7 +145,6 @@ setup
 
   const [processedRows, setProcessedRows] = useState<ReadonlyArray<PerformanceRow>>(rows)
   const [queryState, setQueryState] = useState<QueryState>(() => createInitialQueryState(rows.length))
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [draggedRowId, setDraggedRowId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<{ position: RowDropPosition; rowId: string } | null>(null)
   const draggedRowIdRef = useRef<string | null>(null)
@@ -389,6 +393,8 @@ setup
       rowCount: processedRows.length,
       state: {
         columnFilters,
+        columnOrder,
+        columnVisibility,
         globalFilter,
         pagination,
         sorting,
@@ -398,8 +404,16 @@ setup
         void setExplorerQuery({ q: nextFilter, page: 1 })
       },
       onColumnFiltersChange: (updater) => {
-        setColumnFilters((current) => functionalUpdate(updater, current))
-        void setExplorerQuery({ page: 1 })
+        const nextFilters = functionalUpdate(updater, columnFilters)
+        void setExplorerQuery({ filters: nextFilters, page: 1 })
+      },
+      onColumnOrderChange: (updater) => {
+        const nextOrder = functionalUpdate(updater, columnOrder)
+        void setExplorerQuery({ order: nextOrder })
+      },
+      onColumnVisibilityChange: (updater) => {
+        const nextVisibility = functionalUpdate(updater, columnVisibility)
+        void setExplorerQuery({ visibility: nextVisibility })
       },
       onPaginationChange: (updater) => {
         const nextPagination = functionalUpdate(updater, pagination)
@@ -417,13 +431,15 @@ setup
         })
       },
       initialState: {
-        columnVisibility: { email: false },
+        columnPinning: explorerColumnPinning,
       },
     },
     (state) => ({
       columnFilters: state.columnFilters,
       globalFilter: state.globalFilter,
       pagination: state.pagination,
+      columnOrder: state.columnOrder,
+      columnPinning: state.columnPinning,
       columnVisibility: state.columnVisibility,
       rowSelection: state.rowSelection,
       sorting: state.sorting,
@@ -431,6 +447,11 @@ setup
   )
   const modelStartedAt = performance.now()
   const visibleRows = table.getRowModel().rows
+  const pinnedColumnLayouts = getPinnedColumnLayouts(
+    orderColumnsByPinning(table.getAllLeafColumns(), table.state.columnPinning),
+    table.state.columnPinning,
+    table.state.columnVisibility
+  )
   const modelDurationMs = performance.now() - modelStartedAt
   const filteredCount = processedRows.length
   const selectedCount = Object.keys(table.state.rowSelection).length
@@ -466,9 +487,9 @@ section(className='relative rounded-[0.95em] md:rounded-[0.90em] lg:rounded-[0.8
         each rowCount in SEED_ROW_COUNTS key rowCount
           option(value={String(rowCount)}) #{formatSeedRowCount(rowCount)}
 
-  div(className='flex min-h-12 items-center justify-between gap-4 px-4 pb-3 max-[680px]:flex-col max-[680px]:items-start')
+  div(className='flex min-h-12 items-center justify-between px-4 pb-3 max-[680px]:flex-col max-[680px]:items-start')
     div(className='flex items-center gap-2 md:gap-4')
-      label(className='relative w-full md:w-80 flex items-center')
+      label(className='relative w-full md:w-80 flex items-center mr-4')
         span(className='absolute -m-px size-px overflow-hidden whitespace-nowrap border-0 p-0 [clip:rect(0,0,0,0)]') Search all accounts
         Input(
           ~ type='search'
@@ -477,6 +498,13 @@ section(className='relative rounded-[0.95em] md:rounded-[0.90em] lg:rounded-[0.8
           ~ placeholder='Search contacts, account, region…'
           ~ onInput={(event) => table.setGlobalFilter((event.currentTarget as HTMLInputElement).value)}
           ~ )
+      ColumnView(
+        ~ cols={table.getAllLeafColumns()}
+        ~ columnVisibility={table.state.columnVisibility}
+        ~ onColumnVisibilityChange={table.setColumnVisibility}
+        ~ columnOrder={table.state.columnOrder}
+        ~ onColumnOrderChange={table.setColumnOrder}
+        ~ )
       FilterList(
         ~ rows={rows}
         ~ columnFilters={table.state.columnFilters}
@@ -501,32 +529,15 @@ section(className='relative rounded-[0.95em] md:rounded-[0.90em] lg:rounded-[0.8
 
   div(className='')
     div(className='max-h-[min(590px,64vh)] w-full overflow-auto scrollbar-track-sidebar scrollbar-thumb-slate-400 scrollbar-thin scroll-smooth')
-      Table(className='min-w-[1180px]')
-        TableHeader
-          each headerGroup in table.getHeaderGroups() key headerGroup.id
-            TableRow
-              each header in headerGroup.headers key header.id
-                TableHead(
-                  ~ className={header.column.id === 'select' ? 'ps-4 w-12' : header.column.id === 'contact' ? 'w-72' : ''}
-                  ~ scope='col'
-                  ~ )
-                  if header.column.id === 'select'
-                    Checkbox(
-                      ~ aria-label='Select all rows on this page'
-                      ~ checked={table.getIsAllPageRowsSelected()}
-                      ~ onChange={table.getToggleAllPageRowsSelectedHandler()}
-                      ~ )
-                  else
-                    Button(
-                      ~ type='button'
-                      ~ variant='ghost'
-                      ~ size='none'
-                      ~ className='inline-flex w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent px-0 py-1.5 text-sm text-left text-[inherit] [font-weight:inherit] capitalize tracking-tight disabled:cursor-default'
-                      ~ disabled={!header.column.getCanSort()}
-                      ~ onClick={header.column.getToggleSortingHandler()}
-                      ~ )
-                      span #{header.isPlaceholder ? '' : flexRender(header.column.columnDef.header, header.getContext())}
-                      span(className='text-2xs text-muted-foreground' aria-hidden='true') #{header.column.getIsSorted() === 'asc' ? '⯅' : header.column.getIsSorted() === 'desc' ? '⯆' : ''}
+      HyperTable(
+        ~ table={table}
+        ~ title='Account Explorer'
+        ~ loading={loading}
+        ~ columnPinning={table.state.columnPinning}
+        ~ columnVisibility={table.state.columnVisibility}
+        ~ selectAllChecked={table.getIsAllPageRowsSelected()}
+        ~ onSelectAllChange={table.getToggleAllPageRowsSelectedHandler()}
+        ~ )
         TableBody(ref={rowMotionRootRef})
           each row in visibleRows key row.id
             HyperRow(
@@ -538,9 +549,9 @@ section(className='relative rounded-[0.95em] md:rounded-[0.90em] lg:rounded-[0.8
               ~ isPinned={false}
               ~ isSelected={row.getIsSelected()}
               ~ showSelectColumn={true}
-              ~ columnPinning={explorerColumnPinning}
+              ~ columnPinning={table.state.columnPinning}
               ~ columnVisibility={table.state.columnVisibility}
-              ~ pinnedColumnLayouts={emptyPinnedColumnLayouts}
+              ~ pinnedColumnLayouts={pinnedColumnLayouts}
               ~ )
           empty
             TableRow
