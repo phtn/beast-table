@@ -17,6 +17,8 @@ import Faceted, {
 import Popover, { PopoverContent, PopoverTrigger } from '../ui/Popover.btsx'
 import { cn } from '@/lib/utils'
 import { Icon, type IconName } from '@/lib/icons'
+import type { DateRange } from '@octanejs/day-picker'
+import DateRangePicker from "./DateRangePicker.btsx";
 
 
 module
@@ -153,6 +155,26 @@ module
       new Date(`${value}T00:00:00`)
     )
 
+  const parseDateInput = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number)
+    if (!year || !month || !day) return undefined
+
+    const date = new Date(year, month - 1, day)
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+      ? date
+      : undefined
+  }
+
+  const formatDateInput = (date: Date | undefined) => {
+    if (!date) return ''
+
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, '0'),
+      String(date.getDate()).padStart(2, '0'),
+    ].join('-')
+  }
+
   const getDateRangeLabel = (from: string, to: string) => {
     if (!from) return to ? `Through ${formatDateInputLabel(to)}` : 'Any date'
     if (!to) return `From ${formatDateInputLabel(from)}`
@@ -221,7 +243,7 @@ component FacetedFilter
       ~ type='button'
       ~ aria-labelledby={fieldLabelId}
       ~ disabled={options.length === 0}
-      ~ className={cn('flex h-8 min-w-0 w-full items-center justify-start rounded-md px-1 text-left', triggerClassName)}
+      ~ className={cn('flex h-8 min-w-0 w-full items-center justify-start rounded-sm px-1 text-left', triggerClassName)}
       ~ )
       FacetedBadgeList(
         ~ options={options}
@@ -260,9 +282,9 @@ component NumberRangeFilter
 
   div(
     ~ aria-labelledby={fieldLabelId}
-    ~ className='flex w-full items-center justify-between gap-1.5 rounded-md border-0 bg-background ps-2'
+    ~ className='flex w-full h-7 items-center justify-between gap-1.5 rounded-sm! border-0 bg-background ps-2 overflow-hidden!'
     ~ )
-    label(for={minimumInputId} className='font-mono text-xs tracking-wide') MIN
+    label(for={minimumInputId} className='font-mono text-muted-foreground text-xs tracking-wide opacity-70') MIN
     Input(
       ~ id={minimumInputId}
       ~ type='number'
@@ -273,14 +295,14 @@ component NumberRangeFilter
       ~ value={minimum}
       ~ placeholder='Min'
       ~ aria-label={`${definition.label} minimum`}
-      ~ className='h-7 w-14 rounded-xs bg-background px-0 text-center font-okx text-xs [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+      ~ className='h-6 w-14 rounded-xs bg-white border-none px-0 font-sans text-sm text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none outline-0!'
       ~ onInput={(event) => onValueChange(
       ~   definition.id,
       ~   createRangeFilterValue(event.currentTarget.value, maximum)
       ~ )}
       ~ )
     span(aria-hidden='true' className='text-xs text-muted-foreground') ·
-    label(for={maximumInputId} className='font-mono text-xs tracking-widest opacity-70') MAX
+    label(for={maximumInputId} className='font-mono text-muted-foreground text-xs tracking-widest opacity-70') MAX
     Input(
       ~ id={maximumInputId}
       ~ type='number'
@@ -290,7 +312,7 @@ component NumberRangeFilter
       ~ step={definition.step ?? 'any'}
       ~ value={maximum}
       ~ aria-label={`${definition.label} maximum`}
-      ~ className='h-7 w-14 rounded-sm bg-background px-0 text-center font-okx text-xs [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+      ~ className='h-6 w-14 rounded-sx bg-white border-none px-0 font-sans text-sm text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none outline-0!'
       ~ onInput={(event) => onValueChange(
       ~   definition.id,
       ~   createRangeFilterValue(minimum, event.currentTarget.value)
@@ -305,8 +327,17 @@ component DateRangeFilter
     const to = getRangeInputValue(rawTo)
     const triggerId = `${fieldLabelId}-trigger`
     const contentId = `${fieldLabelId}-content`
-    const fromInputId = `${fieldLabelId}-from`
-    const toInputId = `${fieldLabelId}-to`
+    const selectedRange = from || to
+      ? { from: parseDateInput(from), to: parseDateInput(to) }
+      : undefined
+    const handleSelect = (range: DateRange | undefined) => {
+      onValueChange(
+        definition.id,
+        range
+          ? createRangeFilterValue(formatDateInput(range.from), formatDateInput(range.to))
+          : undefined,
+      )
+    }
 
   Popover
     PopoverTrigger(
@@ -315,45 +346,25 @@ component DateRangeFilter
       ~ aria-controls={contentId}
       ~ aria-labelledby={fieldLabelId}
       ~ className={cn(
-      ~   'flex h-8 min-w-0 w-full items-center justify-start gap-2 overflow-hidden rounded-md px-2 text-sm font-normal',
+      ~   'flex h-8 min-w-0 w-full items-center justify-start gap-2 overflow-hidden rounded-sm px-2 text-sm font-normal',
       ~   !from && !to && 'text-muted-foreground',
       ~   triggerClassName
       ~ )}
       ~ onPointerDown={handleNestedPopoverPointerDown}
       ~ )
-      CalendarIcon(className='size-3.5 shrink-0')
+      Icon(name='calendar' className='size-3.5 text-muted-foreground')
       span.truncate #{getDateRangeLabel(from, to)}
     PopoverContent(
       ~ id={contentId}
-      ~ sideOffset={0}
+      ~ sideOffset={4}
       ~ align='start'
       ~ className='w-72 gap-3 rounded-lg border p-3 backdrop-blur-3xl'
       ~ onFocus={() => document.getElementById(triggerId)?.focus({ preventScroll: true })}
       ~ )
-      div.grid.gap-1.5
-        label(for={fromInputId} className='text-xs font-medium text-muted-foreground') From
-        Input(
-          ~ id={fromInputId}
-          ~ type='date'
-          ~ value={from}
-          ~ aria-label={`${definition.label} start date`}
-          ~ onInput={(event) => onValueChange(
-          ~   definition.id,
-          ~   createRangeFilterValue(event.currentTarget.value, to)
-          ~ )}
-          ~ )
-      div.grid.gap-1.5
-        label(for={toInputId} className='text-xs font-medium text-muted-foreground') Through
-        Input(
-          ~ id={toInputId}
-          ~ type='date'
-          ~ value={to}
-          ~ aria-label={`${definition.label} end date`}
-          ~ onInput={(event) => onValueChange(
-          ~   definition.id,
-          ~   createRangeFilterValue(from, event.currentTarget.value)
-          ~ )}
-          ~ )
+      DateRangePicker(
+        ~ selectedRange={selectedRange}
+        ~ handleSelect={handleSelect}
+        ~ )
 
 component FilterField
   props { definition, fieldLabelId, filters, onValueChange, rawFilterValue, rows }: FilterFieldProps
@@ -407,7 +418,7 @@ Popover(open={open} onOpenChange={setOpen})
     ~ type='button'
     ~ aria-label={activeFilterCount > 0 ? `${activeFilterCount} active filters` : 'Add filters'}
     ~ className={cn(
-    ~   'relative flex h-9 py-2 items-center justify-center gap-1 rounded-xs px-2 text-sm select-none transition-colors duration-75 md:w-auto md:space-x-1 md:px-2.5',
+    ~   'relative flex h-9 py-2 items-center justify-center gap-1 rounded-sm px-2 text-sm select-none transition-colors duration-75 md:w-auto md:space-x-1 md:px-2.5',
     ~   'data-popup-open:bg-zinc-200/50 hover:bg-indigo-200/20 active:bg-foreground/10 focus-visible:outline-1 focus-visible:-outline-offset-1 dark:data-popup-open:bg-zinc-800 dark:hover:bg-indigo-100/5 dark:active:bg-indigo-100/5',
     ~   activeFilterCount > 0 && 'gap-1 md:ps-2 md:pe-2.5'
     ~ )}
@@ -424,7 +435,7 @@ Popover(open={open} onOpenChange={setOpen})
     ~ aria-labelledby={labelId}
     ~ align='start'
     ~ sideOffset={4}
-    ~ className='w-80 gap-2 rounded-md border border-border bg-zinc-200/80 px-4 pt-4 pb-0 backdrop-blur-3xl dark:bg-zinc-900/80'
+    ~ className={cn('w-80 gap-2 rounded-md border border-border bg-zinc-200/80 px-4 p-4 backdrop-blur-3xl dark:bg-zinc-900/80', {'pb-0': activeFilterCount > 0})}
     ~ )
     div(className='flex flex-col')
       // h4(id={labelId} className='select-none font-okx text-sm text-muted-foreground') Add Filter

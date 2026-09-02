@@ -1,0 +1,23 @@
+import { DayPicker } from '@octanejs/day-picker'
+import type { DateRange, ModifierStyles } from '@octanejs/day-picker'
+import styles from '@octanejs/day-picker/style.css'
+module
+  export interface DateRangePickerProps {
+    selectedRange: DateRange | undefined
+    handleSelect: (range: DateRange) => void
+  }
+props { selectedRange, handleSelect }: DateRangePickerProps
+setup
+  const modifierStyles: ModifierStyles = {
+    today: { color: "red" },
+    selected: { backgroundColor: "blue" },
+    weekend: { color: "green" },
+  }
+DayPicker(
+  ~ mode='range'
+  ~ selected={selectedRange}
+  ~ defaultMonth={selectedRange?.from ?? selectedRange?.to}
+  ~ onSelect={handleSelect}
+  ~ showOutsideDays
+  ~ classNames={{chevron: 'size-4', day: 'size-[20px]! text-sm p-0!'}}
+  ~ )

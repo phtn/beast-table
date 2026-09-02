@@ -14,7 +14,7 @@ module
     onNavigate: (href: PanelRoute['href']) => void
   }
 
-  const baseClassName = 'relative mx-4 inline-flex items-center justify-self-end gap-5 max-[1050px]:col-span-full max-[1050px]:row-start-2 max-[1050px]:justify-self-center max-[680px]:w-full pb-1.25'
+  const baseClassName = 'relative mx-4 inline-flex items-center justify-self-end gap-3 sm:gap-5 md:gap-7 lg:gap-8 max-[1050px]:col-span-full max-[1050px]:row-start-2 max-[1050px]:justify-self-center max-[680px]:w-full pb-1.25'
 
 props { activeId, className, items, label = 'Table examples', onNavigate, ...navProps }: Props
 setup
@@ -81,7 +81,7 @@ nav(
       span(className='hidden max-[680px]:inline text-sm font-semibold') #{item.shortLabel}
   div(
     ~ aria-hidden='true'
-    ~ className='pointer-events-none absolute bottom-1 left-0 z-0 h-0.5 rounded-full -translate-y-1/2 bg-sidebar-border w-full'
+    ~ className='pointer-events-none absolute bottom-1 left-0 z-0 h-0.75 rounded-full -translate-y-1/2 bg-border/40 w-full'
     ~ )
   div(
     ~ aria-hidden='true'

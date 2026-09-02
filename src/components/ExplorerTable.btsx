@@ -480,10 +480,10 @@ setup
   const handleSearchChange = (event) => table.setGlobalFilter((event.currentTarget as HTMLInputElement).value)
 
 section(className='relative rounded-[0.95em] md:rounded-[0.90em] lg:rounded-[0.84em] border border-input/70 bg-background shadow-[0_1px_2px_rgba(28,34,26,0.04)]' aria-labelledby='explorer-heading')
-  div(className='absolute -top-1.25 md:-top-2 -left-0.25 md:-left-2 rounded-l-full border-r border-input/70 bg-muted w-2 md:w-4 h-4 rotate-45')
-  div(className='absolute -top-1.25 md:-top-2 -right-0.25 md:-right-2 rounded-r-full border-l border-input/70 bg-muted w-2 md:w-4 h-4 -rotate-45')
-  div(className='absolute -bottom-0.25 md:-bottom-2 -right-1.25 md:-right-2 rounded-b-full border-t border-input/70 bg-muted w-4 h-2 md:h-4 -rotate-45')
-  div(className='absolute -bottom-1.25 md:-bottom-2 -left-0.25 md:-left-2 rounded-l-full border-r border-input/70 bg-muted w-2 md:w-4 h-4 -rotate-45')
+  div(className='absolute -top-1.25 md:-top-2 -left-0.25 md:-left-2 rounded-l-full border-r border-input/70 bg-sidebar-border w-2 md:w-4 h-4 rotate-45')
+  div(className='absolute -top-1.25 md:-top-2 -right-0.25 md:-right-2 rounded-r-full border-l border-input/70 bg-sidebar-border w-2 md:w-4 h-4 -rotate-45')
+  div(className='absolute -bottom-0.25 md:-bottom-2 -right-1.25 md:-right-2 rounded-b-full border-t border-input/70 bg-sidebar-border w-4 h-2 md:h-4 -rotate-45')
+  div(className='absolute -bottom-1.25 md:-bottom-2 -left-0.25 md:-left-2 rounded-l-full border-r border-input/70 bg-sidebar-border w-2 md:w-4 h-4 -rotate-45')
 
   Header(eyebrow='Search + sort + select' title='Account Explorer' description='Scan, rank, and select across the full seeded dataset. Only the active page reaches the table model and DOM.')
     label(className='flex items-center gap-2 p-1 font-mono text-muted-foreground text-xs')
@@ -518,7 +518,7 @@ section(className='relative rounded-[0.95em] md:rounded-[0.90em] lg:rounded-[0.8
       Search(value={query} onChange={handleSearchChange})
 
   div(className='')
-    div(className='h-[612px] w-full overflow-auto scrollbar-track-sidebar scrollbar-thumb-slate-400 scrollbar-thin scroll-smooth')
+    div(className='h-[612px] w-full overflow-auto scrollbar-track-slate-200 scrollbar-thumb-background scrollbar-thin scroll-smooth')
       HyperTable(
         ~ table={table}
         ~ title='Account Explorer'
@@ -549,10 +549,10 @@ section(className='relative rounded-[0.95em] md:rounded-[0.90em] lg:rounded-[0.8
                 b No matching accounts
                 span Try a shorter query or clear the search.
 
-    footer(className='flex items-center justify-between min-h-[50px] gap-5 border-t border-input/50 bg-background p-3 text-xs font-semibold max-[680px]:grid-cols-[1fr_auto] [&_p]:m-0 [&_p:nth-child(2)]:text-center max-[680px]:[&_p:nth-child(2)]:hidden')
+    footer(className='flex items-center justify-between min-h-[50px] gap-5 border-t border-input/50 bg-sidebar p-3 text-xs font-semibold max-[680px]:grid-cols-[1fr_auto] [&_p]:m-0 [&_p:nth-child(2)]:text-center max-[680px]:[&_p:nth-child(2)]:hidden')
       div(className='flex items-center gap-2')
         SelectOctane(
-          ~ className='bg-white py-0 [&_svg]:size-4 text-xs]'
+          ~ className='py-0 [&_svg]:size-4 text-xs]'
           ~ menuPlacement='top'
           ~ value={String(table.state.pagination.pageSize)}
           ~ onChange={(event) => table.setPageSize(Number((event.currentTarget as HTMLSelectElement).value))}

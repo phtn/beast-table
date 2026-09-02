@@ -369,6 +369,12 @@ export const icons = {
       '<g transform="scale(0.667)"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2m2 11.4a1 1 0 0 1 1.072-.114l1.47.736a2 2 0 0 1 1.09 1.54l.228 1.826.005.05a8 8 0 0 1-2.53 1.832 1.8 1.8 0 0 1-1.018-1.159l-.175-.612a2 2 0 0 0-.51-.865l-1.237-1.239a.5.5 0 0 1 .04-.744zM12 4q.726.002 1.417.127a1.665 1.665 0 0 1-.969 2.613l-.611.14a2 2 0 0 0-1.527 2.28l.174 1.047a1 1 0 0 1-1.279 1.121l-1.29-.394A2 2 0 0 1 6.5 9.02V6.514q.002-.18.035-.355A7.97 7.97 0 0 1 12 4" fill="currentColor"/></g>',
     viewBox: '0 0 16 16',
     set: 'svg'
+  },
+  calendar: {
+    symbol:
+      '<g transform="scale(0.667)"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm12-4v4M8 3v4m-4 4h16m-9 4h1m0 0v3"/></g>',
+    viewBox: '0 0 16 16',
+    set: 'svg'
   }
 }
 

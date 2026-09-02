@@ -20,6 +20,9 @@ export default {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
+    extensionAlias: {
+      '.js': ['.ts', '.tsx', '.tsrx', '.js']
+    },
     extensions: ['.btsx', '.tsrx', '.tsx', '.ts', '.jsx', '.js', '.json', '.mjs', '.mts', '.cjs', '.cts']
   },
   module: {
@@ -46,6 +49,14 @@ export default {
       template: './index.html'
     })
   ],
+  optimization: {
+    runtimeChunk: 'single',
+    splitChunks: {
+      chunks: 'all',
+      minSize: 20 * 1024,
+      maxSize: 450 * 1024
+    }
+  },
   devServer: {
     historyApiFallback: true,
     hot: true,

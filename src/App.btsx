@@ -212,19 +212,20 @@ main(
     ~ )
     header(className='w-full fixed top-0 flex items-center justify-between px-6 py-0 ')
       div(className='flex min-w-0 items-center gap-2.5')
-        span(className='grid shrink-0 place-items-center rounded-full' aria-hidden='true')
-          img(className='size-5 md:size-6' src='/beast.svg' alt='beast-logo')
+        span(className='hidden _grid shrink-0 place-items-center rounded-full' aria-hidden='true')
+          img(className='size-5' src='/beast.svg' alt='beast-logo')
         div(className='flex items-center gap-3')
           h2(className='font-sans flex items-center gap-3')
-            span(className='') Beast
-            span(className='opacity-60') /
-            span(className='text-[#ff415a]') 4 Octane Bindings
+            span(className='text-muted-foreground') Beast
+            span(className='text-muted-foreground') #{`/`}
+            span(className='bg-octane w-6 font-medium text-white text-center rounded-xs h-5 leading-5') 4
+            span(className='') Octane Bindings
 
       Progress(progressReady={progressReady} progressError={progressError} progressTitle={progressTitle} progressState={progressState} progressPercent={progressPercent} showAnalyticsProgress={showAnalyticsProgress})
     section#table-panel(
       ~ aria-live='polite'
       ~ aria-labelledby={`route-${activeId}`}
-      ~ className='relative mt-8 mx-0 rounded-[1.40em] md:rounded-t-[1.41em] rounded-b-[0.5em] border border-input bg-muted px-0 sm:px-4 pb-4'
+      ~ className='relative mt-8 mx-0 rounded-[1.40em] md:rounded-t-[1.41em] rounded-b-[0.5em] border border-input bg-sidebar-border px-0 sm:px-4 pb-4'
       ~ )
       div(className='absolute -top-3.25 rounded-[-4px] -left-3.25 border-r border-input bg-background size-6.5 rotate-45')
       div(className='absolute -top-3.25 rounded-[-4px] -right-3.25 border-l border-input bg-background size-6.5 -rotate-45')

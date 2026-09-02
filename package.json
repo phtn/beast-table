@@ -20,6 +20,7 @@
     "@faker-js/faker": "^10.6.0",
     "@octanejs/base-ui": "^0.1.48",
     "@octanejs/cmdk": "^0.1.33",
+    "@octanejs/day-picker": "^0.0.18",
     "@octanejs/dnd-kit": "^0.1.45",
     "@octanejs/gsap": "^0.0.19",
     "@octanejs/motion": "^0.1.51",
@@ -32,7 +33,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "gsap": "^3.15.0",
-    "octane": "0.1.49",
+    "octane": "^0.2.2",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

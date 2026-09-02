@@ -41,7 +41,7 @@ component ColumnViewTrigger
   BaseButton(
     ~ {...buttonProps}
     ~ className={cn(
-    ~   'relative h-9 py-1 md:w-auto flex items-center justify-center rounded-xs portrait:aspect-square',
+    ~   'relative h-9 py-1 md:w-auto flex items-center justify-center rounded-sm portrait:aspect-square',
     ~   'select-none text-foreground text-sm mx-1 md:space-x-1 md:px-2.5 gap-1 w-8.5',
     ~   'data-pressed:bg-zinc-200/50 dark:data-pressed:bg-zinc-800',
     ~   'hover:bg-orange-200/20 dark:hover:bg-mist-100/5 transition-colors duration-75',

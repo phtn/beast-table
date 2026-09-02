@@ -181,11 +181,11 @@ component FacetedBadgeList
       ~ className={cn('flex w-full items-center justify-between font-okx', className)}
       ~ )
       if values.length > max
-        span(className={cn('inline-flex items-center rounded-sm bg-secondary px-2 py-0.5 text-xs font-normal text-secondary-foreground', badgeClassName)})
+        span(className={cn('inline-flex items-center rounded-xs bg-secondary px-2 py-0.5 text-xs font-normal text-secondary-foreground', badgeClassName)})
           | #{values.length} selected
       else
         each value in values key value
-          span(className={cn('inline-flex min-w-0 items-center rounded-sm bg-secondary px-2 py-0.5 text-xs font-normal text-secondary-foreground', badgeClassName)})
+          span(className={cn('inline-flex min-w-0 items-center rounded-xs bg-secondary px-2 py-0.5 text-xs font-normal text-secondary-foreground', badgeClassName)})
             span.truncate #{getLabel(value)}
       ChevronDownIcon(className='ml-auto size-3.5 shrink-0 opacity-80')
 
