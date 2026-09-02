@@ -1,5 +1,3 @@
-/// <reference types="vite/client" />
-
 declare module '*.btsx' {
   import type { ComponentBody } from 'octane'
 

@@ -9,7 +9,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "jsx": "preserve",
-    "types": ["vite/client", "node"],
+    "types": ["node"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
@@ -20,7 +20,7 @@
       }
     ]
   },
-  "include": ["src", "vite.config.ts"],
+  "include": ["src"],
   "tsrx": {
     "compiler": "octane/compiler/volar"
   }

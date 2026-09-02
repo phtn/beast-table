@@ -1,5 +1,7 @@
-import { ClassName } from '@/types'
+import type { ClassValue } from 'clsx'
 import { IconNameType } from './icons'
+
+type ClassName = ClassValue
 
 export type IconList = Record<IconNameType, { viewBox: string; symbol: string }>
 

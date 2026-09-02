@@ -1,0 +1,39 @@
+import { ProgressBar } from '@/components/ui'
+module
+  type ProgressProps = {
+    progressReady: boolean
+    progressError: boolean
+    progressTitle: string
+    progressState: { elapsedMs: number }
+    progressPercent: number
+    showAnalyticsProgress: boolean
+  }
+props {progressReady, progressError, progressTitle, progressState, progressPercent, showAnalyticsProgress}: ProgressProps
+div(
+  ~
+  ~ role='status'
+  ~ aria-live='polite'
+  ~ )
+  div(className='min-w-64 flex items-center justify-between gap-2')
+    div(
+      ~ aria-hidden='true'
+      ~ )
+      span(className='text-xs') #{progressTitle} in #{(progressState.elapsedMs / 1_000).toFixed(1)}s
+    div(className='text-right')
+      b(className='font-mono text-xs') #{progressPercent.toFixed(0)}%
+  ProgressBar(
+    ~ className='max-[680px]:col-span-full max-[680px]:row-start-2'
+    ~ label={showAnalyticsProgress ? 'Analytics indexing progress' : 'Dataset seeding progress'}
+    ~ value={progressPercent}
+    ~ tone={progressReady ? 'success' : progressError ? 'error' : 'active'}
+    ~ )
+
+
+  if progressError
+    Button(
+      ~ type='button'
+      ~ variant='danger'
+      ~ size='none'
+      ~ className='h-8 px-3 text-[9px] font-[750] max-[680px]:col-span-full max-[680px]:justify-self-start'
+      ~ onClick={retryProgress}
+      ~ ) Retry

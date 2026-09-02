@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'octane'
+import { IconName } from './lib/icons'
 
 export type PanelId = 'explorer' | 'analytics' | 'stream'
 
@@ -7,12 +8,13 @@ export interface PanelRoute {
   id: PanelId
   label: string
   shortLabel: string
+  icon: IconName
 }
 
 export const panelRoutes: readonly PanelRoute[] = [
-  { id: 'explorer', href: '/explorer', label: 'Explorer', shortLabel: 'Explorer' },
-  { id: 'analytics', href: '/analytics', label: 'Analytics', shortLabel: 'Analytics' },
-  { id: 'stream', href: '/stream', label: 'Live Stream', shortLabel: 'Stream' }
+  { id: 'explorer', href: '/explorer', label: 'Explorer', shortLabel: 'Explorer', icon: 'globe' },
+  { id: 'analytics', href: '/analytics', label: 'Analytics', shortLabel: 'Analytics', icon: 'pie' },
+  { id: 'stream', href: '/stream', label: 'Live Stream', shortLabel: 'Stream', icon: 'player' }
 ]
 
 const navigationEvent = 'table:navigate'

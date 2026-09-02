@@ -147,7 +147,7 @@ component FacetedTrigger
     ~ {...triggerProps}
     ~ ref={composedRef}
     ~ className={cn(
-    ~   'justify-between bg-background focus:outline-none focus:ring-1 focus:ring-indigo-500 hover:bg-indigo-600/5',
+    ~   'justify-between bg-background focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:bg-indigo-200/5',
     ~   className
     ~ )}
     ~ onPointerDown={onPointerDown}

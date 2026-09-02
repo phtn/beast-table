@@ -1,22 +1,18 @@
 import { lazy, useEffect, useState } from 'octane'
-import {PanelTabs} from '@/components'
-import {Button, ProgressBar} from '@/components/ui'
+import PanelTabs from './components/PanelTabs.btsx'
+import Button from './components/ui/Button.btsx'
+import ProgressBar from './components/ui/ProgressBar.btsx'
 import { formatCompact, prepareAnalyticsRows, ROW_COUNT, seedPerformanceRows } from './data'
 import type { AnalyticsRow, PerformanceRow, SeedRowCount } from './data'
 import { navigate, panelRoutes, usePanelRoute } from './router'
+import type { SeedState, SeedPhase } from "./components/Seed.btsx";
+import Seed from "./components/Seed.btsx";
+import Progress from "./components/Progress.btsx";
+import SlideTabs from "./components/SlideTabs.btsx";
+
 
 module
-  type SeedPhase = 'preparing' | 'loading' | 'seeding' | 'ready' | 'error'
   type AnalyticsPhase = 'idle' | 'indexing' | 'ready' | 'error'
-
-  interface SeedState {
-    completed: number
-    elapsedMs: number
-    error: string | null
-    phase: SeedPhase
-    rows: ReadonlyArray<PerformanceRow> | null
-    total: number
-  }
 
   interface AnalyticsState {
     completed: number
@@ -214,76 +210,31 @@ main(
     ~ className='w-[min(100%,1480px)] overflow-hidden bg-background'
     ~ aria-labelledby='showcase-title'
     ~ )
-    header(className='grid grid-cols-[minmax(210px,1fr)_auto] items-center gap-6 px-6 py-0 max-[1050px]:grid-cols-[1fr_auto]')
+    header(className='w-full fixed top-0 flex items-center justify-between px-6 py-0 ')
       div(className='flex min-w-0 items-center gap-2.5')
         span(className='grid shrink-0 place-items-center rounded-full' aria-hidden='true')
-          img(className='size-[32px] md:size-8' src='/beast.svg' alt='beast-logo')
+          img(className='size-5 md:size-6' src='/beast.svg' alt='beast-logo')
         div(className='flex items-center gap-3')
           h2(className='font-sans flex items-center gap-3')
             span(className='') Beast
             span(className='opacity-60') /
             span(className='text-[#ff415a]') 4 Octane Bindings
-      PanelTabs(
+
+      Progress(progressReady={progressReady} progressError={progressError} progressTitle={progressTitle} progressState={progressState} progressPercent={progressPercent} showAnalyticsProgress={showAnalyticsProgress})
+    section#table-panel(
+      ~ aria-live='polite'
+      ~ aria-labelledby={`route-${activeId}`}
+      ~ className='relative mt-8 mx-0 rounded-[1.40em] md:rounded-t-[1.41em] rounded-b-[0.5em] border border-input bg-muted px-0 sm:px-4 pb-4'
+      ~ )
+      div(className='absolute -top-3.25 rounded-[-4px] -left-3.25 border-r border-input bg-background size-6.5 rotate-45')
+      div(className='absolute -top-3.25 rounded-[-4px] -right-3.25 border-l border-input bg-background size-6.5 -rotate-45')
+      SlideTabs(
         ~ activeId={activeId}
         ~ items={panelRoutes}
         ~ onNavigate={navigate}
         ~ )
-    section#table-panel(
-      ~ aria-live='polite'
-      ~ aria-labelledby={`route-${activeId}`}
-      ~ className='relative mx-0 rounded-[1.40em] md:rounded-t-[1.41em] rounded-b-[0.5em] border border-input bg-muted p-4 sm:px-2 pb-2 pt-10'
-      ~ )
-      div(className='absolute -top-3.25 rounded-[-4px] -left-3.25 border-r border-input bg-background size-6.5 rotate-45')
-      div(className='absolute -top-3.25 rounded-[-4px] -right-3.25 border-l border-input bg-background size-6.5 -rotate-45')
-      div(
-        ~
-        ~ role='status'
-        ~ aria-live='polite'
-        ~ )
-        div(className='flex min-w-0 items-center gap-2')
-          span(
-            ~ className={`size-2 shrink-0 rounded-full motion-reduce:animate-none ${progressReady ? 'opacity-0' : progressError ? 'bg-octane animate-pulse' : 'bg-[#ff415a] animate-pulse'}`}
-            ~ aria-hidden='true'
-            ~ )
-          div(className='grid min-w-0 gap-0.75')
-            b(className='text-2xs text-[#292e28]') #{progressTitle} in #{(progressState.elapsedMs / 1_000).toFixed(1)}s
-        ProgressBar(
-          ~ className='max-[680px]:col-span-full max-[680px]:row-start-2'
-          ~ label={showAnalyticsProgress ? 'Analytics indexing progress' : 'Dataset seeding progress'}
-          ~ value={progressPercent}
-          ~ tone={progressReady ? 'success' : progressError ? 'error' : 'active'}
-          ~ )
-        div(className='grid min-w-[52px] gap-0.5 text-right max-[680px]:col-start-2 max-[680px]:row-start-1')
-          b(className='font-mono text-[11px] tabular-nums text-[#363b35]') #{progressPercent.toFixed(0)}%
-
-        if progressError
-          Button(
-            ~ type='button'
-            ~ variant='danger'
-            ~ size='none'
-            ~ className='h-8 px-3 text-[9px] font-[750] max-[680px]:col-span-full max-[680px]:justify-self-start'
-            ~ onClick={retryProgress}
-            ~ ) Retry
-
       if seedState.rows === null || !tablesMounted
-        section(className='grid min-h-[min(610px,70vh)] grid-cols-[minmax(260px,0.7fr)_minmax(420px,1.3fr)] items-center gap-[clamp(30px,6vw,90px)] overflow-hidden rounded-[18px] border border-[rgba(25,31,24,0.065)] bg-[#fcfdfb] p-[clamp(34px,6vw,82px)] max-[1050px]:grid-cols-[minmax(240px,0.8fr)_minmax(360px,1.2fr)] max-[1050px]:gap-[35px] max-[1050px]:px-[34px] max-[1050px]:py-11 max-[680px]:min-h-[560px] max-[680px]:grid-cols-1 max-[680px]:gap-8 max-[680px]:px-5 max-[680px]:pb-[30px] max-[680px]:pt-[38px]' aria-labelledby='seed-stage-title')
-          div(className='max-w-[440px]')
-            h2#seed-stage-title(className='m-0 max-w-[440px] text-[clamp(20px,4vw,36px)] font-[590] leading-[1.02] tracking-[-0.055em] text-[#20241f]') #{seedState.phase === 'error' ? 'The dataset needs another try' : 'Fetching data...'}
-            p(className='mb-0 mt-[18px] max-w-[390px] text-[13px] leading-[1.6] text-[#7c8379]') #{seedState.phase === 'error' ? 'Retry the deterministic seed without reloading the page.' : 'Rows are created in small chunks and progress stay responsive.'}
-          div(className='rotate-[0.8deg] overflow-hidden rounded-[15px] border border-[#e2e6df] bg-white shadow-[0_22px_50px_rgba(40,49,37,0.08)] max-[680px]:w-[720px] max-[680px]:max-w-none' aria-hidden='true')
-            div(className='grid min-h-10 grid-cols-[1.5fr_1fr_0.8fr_0.65fr_0.7fr] items-center gap-[18px] border-b border-[#edf0eb] bg-[#f5f7f3] px-[18px] [&_span]:block [&_span]:h-1.5 [&_span]:w-[56%] [&_span]:overflow-hidden [&_span]:rounded-full [&_span]:bg-[#dfe3dc]')
-              span
-              span
-              span
-              span
-              span
-            each row in placeholderRows key row
-              div(className="grid min-h-[52px] grid-cols-[1.5fr_1fr_0.8fr_0.65fr_0.7fr] items-center gap-[18px] border-b border-[#edf0eb] px-[18px] last:border-b-0 [&_span]:block [&_span]:h-[7px] [&_span]:overflow-hidden [&_span]:rounded-full [&_span]:bg-[#e8ebe6] [&_span]:after:block [&_span]:after:h-full [&_span]:after:w-[45%] [&_span]:after:animate-pulse [&_span]:after:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.85),transparent)] [&_span]:after:content-[''] [&_span:first-child]:h-2.5 [&_span:first-child]:w-[88%] [&_span:nth-child(2)]:w-[74%] [&_span:nth-child(3)]:w-[65%] [&_span:nth-child(4)]:w-[82%] [&_span:nth-child(5)]:w-[62%]")
-                span
-                span
-                span
-                span
-                span
+        Seed(seedState={seedState})
       elseif activeId === 'analytics' && analyticsState.rows === null
         section(className='grid min-h-[min(610px,70vh)] grid-cols-[minmax(260px,0.7fr)_minmax(420px,1.3fr)] items-center gap-[clamp(30px,6vw,90px)] overflow-hidden rounded-[18px] border border-[rgba(25,31,24,0.065)] bg-[#fcfdfb] p-[clamp(34px,6vw,82px)] max-[1050px]:grid-cols-[minmax(240px,0.8fr)_minmax(360px,1.2fr)] max-[1050px]:gap-[35px] max-[1050px]:px-[34px] max-[1050px]:py-11 max-[680px]:min-h-[560px] max-[680px]:grid-cols-1 max-[680px]:gap-8 max-[680px]:px-5 max-[680px]:pb-[30px] max-[680px]:pt-[38px]' aria-labelledby='analytics-stage-title')
           div(className='max-w-[440px]')

@@ -31,9 +31,8 @@ fragment
         ~ aria-label={`Sort by ${header.column.id}${sorted ? `, currently ${sorted === 'asc' ? 'ascending' : 'descending'}` : ''}`}
         ~ )
         span(className='min-w-0 truncate') #{flexRender(header.column.columnDef.header, header.getContext())}
-        Icon(
-          ~ name='arrow-drop-down'
-          ~ className={sortIconClassName}
-          ~ )
+        span(className={cn('text-xs text-border line-through decoration-sidebar', {'-line-through text-muted-foreground text-xs': sorted })}) #{sorted === 'asc' ? '⯅' : sorted === 'desc' ? '⯆' : '♢'}
+
+
     else
       | #{flexRender(header.column.columnDef.header, header.getContext())}

@@ -339,6 +339,36 @@ export const icons = {
       '<g transform="scale(0.667)"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 4v16m6-16v16M5 20h14a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1"/></g>',
     viewBox: '0 0 16 16',
     set: 'svg'
+  },
+  globe: {
+    symbol:
+      '<g transform="scale(0.667)"><path d="M11 4a5 5 0 1 1-4.995 5.217L6 9l.005-.217A5 5 0 0 1 11 4" fill="currentColor"/><path d="M14.133 1.502a1 1 0 0 1 1.365-.369A9.015 9.015 0 1 1 5.094 15.755a1 1 0 1 1 1.312-1.51 7.015 7.015 0 1 0 8.096-11.378 1 1 0 0 1-.369-1.365" fill="currentColor"/><path d="M11 16a1 1 0 0 1 .993.883L12 17v4a1 1 0 0 1-1.993.117L10 21v-4a1 1 0 0 1 1-1" fill="currentColor"/><path d="M15 20a1 1 0 0 1 .117 1.993L15 22H7a1 1 0 0 1-.117-1.993L7 20z" fill="currentColor"/></g>',
+    viewBox: '0 0 16 16',
+    set: 'svg'
+  },
+  pie: {
+    symbol:
+      '<g transform="scale(0.667)"><path d="M9.883 2.207a1.9 1.9 0 0 1 2.087 1.522l.025.167L12 4v7a1 1 0 0 0 .883.993L13 12h6.8a2 2 0 0 1 2 2 1 1 0 0 1-.026.226A10 10 0 1 1 9.504 2.293l.27-.067z" fill="currentColor"/><path d="M14 3.5V9a1 1 0 0 0 1 1h5.5a1 1 0 0 0 .943-1.332 10 10 0 0 0-6.11-6.111A1 1 0 0 0 14 3.5" fill="currentColor"/></g>',
+    viewBox: '0 0 16 16',
+    set: 'svg'
+  },
+  player: {
+    symbol:
+      '<g transform="scale(0.667)"><path d="M18 3a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5H6a5 5 0 0 1-5-5V8a5 5 0 0 1 5-5zM9 9v6a1 1 0 0 0 1.514.857l5-3a1 1 0 0 0 0-1.714l-5-3A1 1 0 0 0 9 9" fill="currentColor"/></g>',
+    viewBox: '0 0 16 16',
+    set: 'svg'
+  },
+  slash: {
+    symbol:
+      '<g transform="scale(0.667)"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2M9.3 19H7l7.7-14H17z" fill="currentColor"/></g>',
+    viewBox: '0 0 16 16',
+    set: 'svg'
+  },
+  world: {
+    symbol:
+      '<g transform="scale(0.667)"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2m2 11.4a1 1 0 0 1 1.072-.114l1.47.736a2 2 0 0 1 1.09 1.54l.228 1.826.005.05a8 8 0 0 1-2.53 1.832 1.8 1.8 0 0 1-1.018-1.159l-.175-.612a2 2 0 0 0-.51-.865l-1.237-1.239a.5.5 0 0 1 .04-.744zM12 4q.726.002 1.417.127a1.665 1.665 0 0 1-.969 2.613l-.611.14a2 2 0 0 0-1.527 2.28l.174 1.047a1 1 0 0 1-1.279 1.121l-1.29-.394A2 2 0 0 1 6.5 9.02V6.514q.002-.18.035-.355A7.97 7.97 0 0 1 12 4" fill="currentColor"/></g>',
+    viewBox: '0 0 16 16',
+    set: 'svg'
   }
 }
 

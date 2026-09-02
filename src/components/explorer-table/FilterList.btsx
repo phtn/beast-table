@@ -16,7 +16,7 @@ import Faceted, {
   ~ } from '../ui/Faceted.btsx'
 import Popover, { PopoverContent, PopoverTrigger } from '../ui/Popover.btsx'
 import { cn } from '@/lib/utils'
-import { Icon } from '@/lib/icons'
+import { Icon, type IconName } from '@/lib/icons'
 
 
 module
@@ -26,6 +26,7 @@ module
   interface FilterDefinitionBase {
     id: ExplorerFilterId
     label: string
+    icon?: IconName
   }
 
   interface FacetedFilterDefinition extends FilterDefinitionBase {
@@ -71,15 +72,15 @@ module
   }
 
   const explorerFilterDefinitions = [
-    { id: 'region', label: 'Region', variant: 'faceted' },
-    { id: 'status', label: 'Status', variant: 'faceted', values: statuses },
-    { id: 'revenue', label: 'Revenue', variant: 'number-range', min: 0, step: 1_000 },
-    { id: 'health', label: 'Health', variant: 'number-range', min: 0, max: 100, step: 1 },
-    { id: 'updatedAt', label: 'Updated', variant: 'date-range' }
+    { id: 'region', label: 'Region', variant: 'faceted', icon: 'world' },
+    { id: 'status', label: 'Status', variant: 'faceted', icon: 'world', values: statuses },
+    { id: 'revenue', label: 'Revenue', variant: 'number-range', icon: 'world', min: 0, step: 1_000 },
+    { id: 'health', label: 'Health', variant: 'number-range', icon: 'world', min: 0, max: 100, step: 1 },
+    { id: 'updatedAt', label: 'Updated', variant: 'date-range', icon: 'world' }
   ] as const satisfies ReadonlyArray<FilterDefinition>
 
   const triggerClassName =
-    'border-2 border-border/25 bg-background hover:border-indigo-100/10 hover:bg-indigo-600/5 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:hover:bg-indigo-100/10 dark:focus:border-background dark:focus:ring-indigo-200/40'
+    'border-2 border-border/25 bg-background hover:bg-white hover:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400'
 
   const getRangeBounds = (value: unknown): readonly [unknown, unknown] =>
     Array.isArray(value) ? [value[0], value[1]] : [undefined, undefined]
@@ -227,7 +228,7 @@ component FacetedFilter
         ~ max={1}
         ~ placeholder={options.length > 0 ? 'Any' : 'No values'}
         ~ className='min-w-0 flex-nowrap overflow-hidden'
-        ~ badgeClassName=''
+        ~ badgeClassName='bg-indigo-500 text-white'
         ~ )
     FacetedContent(className='w-64 p-0')
       FacetedList
@@ -236,13 +237,14 @@ component FacetedFilter
           each option in options key option.value
             FacetedItem(value={option.value} className='')
               div.flex.w-full.items-center.justify-between
-                span.truncate #{option.label}
-                span(
-                  ~ className={cn(
-                  ~   'font-sans text-sm text-foreground/40',
-                  ~   option.count > 0 && 'text-indigo-400 dark:text-indigo-300'
-                  ~ )}
-                  ~ ) #{option.count.toLocaleString()}
+                div(className='flex items-center justify-start')
+                  span.truncate #{option.label}
+              span(
+                ~ className={cn(
+                ~   'font-sans text-sm text-foreground/40',
+                ~   option.count > 0 && 'text-indigo-400 dark:text-indigo-300'
+                ~ )}
+                ~ ) #{option.count.toLocaleString()}
 
 component NumberRangeFilter
   props { definition, fieldLabelId, onValueChange, rawFilterValue }: FilterFieldProps & { definition: NumberRangeFilterDefinition }
@@ -258,9 +260,9 @@ component NumberRangeFilter
 
   div(
     ~ aria-labelledby={fieldLabelId}
-    ~ className='flex w-full items-center justify-between gap-1.5 rounded-md border border-border/60 bg-background ps-2 hover:bg-indigo-600/5 focus-within:ring-1 focus-within:ring-indigo-500'
+    ~ className='flex w-full items-center justify-between gap-1.5 rounded-md border-0 bg-background ps-2'
     ~ )
-    label(for={minimumInputId} className='font-mono text-xs tracking-widest opacity-70') MIN
+    label(for={minimumInputId} className='font-mono text-xs tracking-wide') MIN
     Input(
       ~ id={minimumInputId}
       ~ type='number'
@@ -271,7 +273,7 @@ component NumberRangeFilter
       ~ value={minimum}
       ~ placeholder='Min'
       ~ aria-label={`${definition.label} minimum`}
-      ~ className='h-7 w-14 rounded-sm bg-background px-0 text-center font-okx text-xs [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+      ~ className='h-7 w-14 rounded-xs bg-background px-0 text-center font-okx text-xs [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
       ~ onInput={(event) => onValueChange(
       ~   definition.id,
       ~   createRangeFilterValue(event.currentTarget.value, maximum)
@@ -323,9 +325,9 @@ component DateRangeFilter
       span.truncate #{getDateRangeLabel(from, to)}
     PopoverContent(
       ~ id={contentId}
-      ~ sideOffset={6}
+      ~ sideOffset={0}
       ~ align='start'
-      ~ className='w-72 gap-3 rounded-lg border p-3 backdrop-blur-3xl dark:border-indigo-200/30 dark:bg-indigo-100/5'
+      ~ className='w-72 gap-3 rounded-lg border p-3 backdrop-blur-3xl'
       ~ onFocus={() => document.getElementById(triggerId)?.focus({ preventScroll: true })}
       ~ )
       div.grid.gap-1.5
@@ -355,7 +357,7 @@ component DateRangeFilter
 
 component FilterField
   props { definition, fieldLabelId, filters, onValueChange, rawFilterValue, rows }: FilterFieldProps
-  div(className='grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-2')
+  div(className='grid grid-cols-[7.5rem_minmax(0,1fr)] items-center')
     span(id={fieldLabelId} className='truncate font-okx text-sm capitalize') #{definition.label}
     switch definition.variant
       case 'faceted'
@@ -421,31 +423,29 @@ Popover(open={open} onOpenChange={setOpen})
     ~ aria-describedby={descriptionId}
     ~ aria-labelledby={labelId}
     ~ align='start'
-    ~ sideOffset={3}
-    ~ className='w-80 gap-2 rounded-md border border-border/60 bg-zinc-200/80 p-0 backdrop-blur-3xl dark:bg-zinc-900/80'
+    ~ sideOffset={4}
+    ~ className='w-80 gap-2 rounded-md border border-border bg-zinc-200/80 px-4 pt-4 pb-0 backdrop-blur-3xl dark:bg-zinc-900/80'
     ~ )
-    div.flex.flex-col.gap-1
+    div(className='flex flex-col')
       // h4(id={labelId} className='select-none font-okx text-sm text-muted-foreground') Add Filter
       p(id={descriptionId} className='sr-only') Filter the account explorer by field values and ranges.
 
     if open
-      div.space-y-2.p-3
-        each definition in explorerFilterDefinitions key definition.id
-          FilterField(
-            ~ definition={definition}
-            ~ fieldLabelId={`${baseId}-${definition.id}-label`}
-            ~ filters={columnFilters}
-            ~ onValueChange={handleFilterValueChange}
-            ~ rawFilterValue={getFilterValue(columnFilters, definition.id)}
-            ~ rows={rows}
-            ~ )
+      each definition in explorerFilterDefinitions key definition.id
+        FilterField(
+          ~ definition={definition}
+          ~ fieldLabelId={`${baseId}-${definition.id}-label`}
+          ~ filters={columnFilters}
+          ~ onValueChange={handleFilterValueChange}
+          ~ rawFilterValue={getFilterValue(columnFilters, definition.id)}
+          ~ rows={rows}
+          ~ )
 
     if activeFilterCount > 0
-      div(className='flex justify-end border-t border-border/60 border-dashed p-1')
+      div(className='flex items-center justify-end border-t border-border/60 border-dashed p-1')
         Button(
           ~ type='button'
           ~ variant='ghost'
-          ~ size='sm'
           ~ className='inline-flex items-center gap-1'
           ~ onClick={() => onColumnFiltersChange([])}
           ~ )

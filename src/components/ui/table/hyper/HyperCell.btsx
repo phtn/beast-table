@@ -33,8 +33,5 @@ td(
       ~ 'pointer-events-none': !isVisible
       ~ })}
   ~ )
-  div(className={cn('min-w-0 overflow-hidden p-3 transform-gpu transition-all duration-200 ease-out motion-reduce:transition-none origin-left opacity-0 scale-50',
-    ~ {
-      ~ 'opacity-100 scale-100': isVisible
-      ~ })})
+  div(className={cn('min-w-0 overflow-hidden p-3 transition-all duration-180 ease-out motion-reduce:transition-none origin-left opacity-0 scale-50',{'opacity-100 scale-100': isVisible})})
     FlexRender(cell={cell})

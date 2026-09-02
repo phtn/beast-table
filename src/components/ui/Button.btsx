@@ -3,7 +3,7 @@ import { Button as ButtonBase } from '@octanejs/base-ui/Button'
 
 module
   type NativeButtonProps = JSX.IntrinsicElements['button']
-  type ButtonSize = 'md' | 'sm' | 'icon' | 'none'
+  type ButtonSize = 'md' | 'sm' | 'icon' | 'none' | 'lg' | 'icon-lg'
   type ButtonVariant = 'default' | 'ghost' | 'danger' | 'unstyled'
 
   type Props = Omit<NativeButtonProps, 'class' | 'className' | 'type'> & {
@@ -32,8 +32,12 @@ ButtonBase(
   ~     : size === 'sm'
   ~       ? 'h-[33px] px-[11px] text-[9px] font-[750]'
   ~       : size === 'icon'
-  ~         ? 'size-[31px] p-0'
-  ~         : '',
+  ~         ? 'size-[32px] p-0'
+  ~         : size === 'lg'
+  ~           ? 'h-10 px-4 text-xs font-[750]'
+  ~           : size === 'icon-lg'
+  ~             ? 'size-[36px] p-0'
+  ~             : '',
   ~   className,
   ~ ]}
   ~ )
