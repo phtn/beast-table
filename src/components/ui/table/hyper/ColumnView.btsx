@@ -7,7 +7,7 @@ import { Icon } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { mergeColumnOrder } from './column-order'
 import { getColumnHeaderText } from './filter-utils'
-import Sortable, { SortableContent, SortableItem } from './sortable.btsx'
+import Sortable, { SortableContent, SortableItem, SortableOverlay } from './sortable.btsx'
 import { isColumnVisible } from './Visibility'
 import Checkbox from '../../Checkbox.btsx'
 
@@ -127,6 +127,22 @@ setup
     },
     [cols, columnOrder, onColumnOrderChange],
   )
+  const renderColumnOverlay = useCallback(
+    ({ value }: { value: string | number }) => {
+      const column = cols.find((candidate) => candidate.id === String(value))
+      return createElement(
+        'div',
+        {
+          className: cn(
+            'flex h-8 w-[238px] items-center rounded-sm border border-input/70',
+            'bg-background px-3 text-xs text-foreground shadow-md',
+          ),
+        },
+        column ? getColumnHeaderText(column) : String(value),
+      )
+    },
+    [cols],
+  )
 
 Sortable(value={reorderableColumnIds} onValueChange={handleColumnOrderChange})
   Menu.Root
@@ -194,3 +210,8 @@ Sortable(value={reorderableColumnIds} onValueChange={handleColumnOrderChange})
                   ~ isVisible={visibilityByColumnId.get(column.id) ?? true}
                   ~ onToggle={handleToggle}
                   ~ )
+  SortableOverlay(
+    ~ className='pointer-events-none z-60'
+    ~ dropAnimation={null}
+    ~ children={renderColumnOverlay}
+    ~ )

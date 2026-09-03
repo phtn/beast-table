@@ -4,6 +4,7 @@ import type { Modifiers, UniqueIdentifier } from '@dnd-kit/abstract'
 import { RestrictToHorizontalAxis, RestrictToVerticalAxis } from '@dnd-kit/abstract/modifiers'
 import { Accessibility } from '@dnd-kit/dom'
 import { RestrictToElement } from '@dnd-kit/dom/modifiers'
+import { OptimisticSortingPlugin, SortableKeyboardPlugin } from '@dnd-kit/dom/sortable'
 import { DragDropProvider,
   ~ DragOverlay,
   ~ type DragDropProviderProps,
@@ -197,6 +198,7 @@ component SortableItem
       group: context.id,
       disabled,
       collisionDetector: context.collisionDetector,
+      plugins: [SortableKeyboardPlugin, OptimisticSortingPlugin],
     })
     const composedRef = useComposedRefs(ref, (node: HTMLElement | null) => {
       if (disabled) return
@@ -222,6 +224,10 @@ component SortableItem
         id,
         'data-dragging': sortable.isDragging ? '' : undefined,
         ...itemProps,
+        style: {
+          ...(itemProps.style ?? {}),
+          opacity: sortable.isDragging ? 0 : itemProps.style?.opacity,
+        },
         tabIndex: disabled ? undefined : 0,
         children: childIsRenderElement ? undefined : children,
         className: cn(
@@ -231,7 +237,7 @@ component SortableItem
             'cursor-default': context.flatCursor,
             'data-dragging:cursor-grabbing': !context.flatCursor,
             'cursor-grab': !sortable.isDragging && asHandle && !context.flatCursor,
-            'opacity-50': sortable.isDragging,
+            'pointer-events-none opacity-0': sortable.isDragging,
             'pointer-events-none opacity-50': disabled,
           },
           className,
@@ -397,7 +403,10 @@ setup
 
   const handleDragStart: ProviderHandler<'onDragStart'> = (event, manager) => {
     onDragStart?.(event, manager)
-    if (!wasPrevented(event)) setActiveId(event.operation.source?.id ?? null)
+    if (!wasPrevented(event)) {
+      const nextActiveId = event.operation.source?.id ?? null
+      setActiveId(nextActiveId)
+    }
   }
   const handleDragMove: ProviderHandler<'onDragMove'> = (event, manager) => {
     onDragMove?.(event, manager)
@@ -415,12 +424,17 @@ setup
     if (!wasPrevented(event)) {
       const active = event.operation.source
       const over = event.operation.target
-      if (active && over && active.id !== over.id) {
+      const overId = active && isSortable(active) ? (active as any).index : null
+      if (active) {
         const activeIndex = value.findIndex((item) => getItemValue(item) === active.id)
-        const overIndex = value.findIndex((item) => getItemValue(item) === over.id)
+        const overIndex = typeof overId === 'number'
+          ? overId
+          : over
+            ? value.findIndex((item) => getItemValue(item) === over.id)
+            : activeIndex
         if (activeIndex >= 0 && overIndex >= 0) {
           if (onMove) onMove({ ...event, activeIndex, overIndex })
-          else onValueChange?.(arrayMove(value, activeIndex, overIndex))
+          else if (activeIndex !== overIndex) onValueChange?.(arrayMove(value, activeIndex, overIndex))
         }
       }
     }
